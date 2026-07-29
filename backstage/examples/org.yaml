@@ -226,17 +226,18 @@ spec:
     displayName: SRE User
   memberOf:
     - sre-team
+
 ---
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
   name: fcastril
+  title: FCastril
   annotations:
     github.com/user-login: fcastril
 spec:
   profile:
-    displayName: fcastril
+    displayName: FCastril
     email: fcastril@ohorizons.com
   memberOf:
-    - platform-team
-
+    - platform-engineering
