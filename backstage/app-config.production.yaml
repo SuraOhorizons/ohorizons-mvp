@@ -1,0 +1,154 @@
+# Agentic DevOps Platform — Open Horizons (Backstage) Production Config
+app:
+  title: ${PORTAL_NAME:-Open Horizons} — Agentic DevOps Platform
+  baseUrl: ${APP_BASE_URL}
+
+organization:
+  name: ${PORTAL_NAME:-Open Horizons}
+
+platform:
+  githubRepository: ${GITHUB_ORG}/${GITHUB_REPO}
+
+backend:
+  baseUrl: ${APP_BASE_URL}
+  listen:
+    port: 7007
+  auth:
+    externalAccess:
+      - type: static
+        options:
+          token: ${BACKEND_SECRET}
+          subject: external
+    keys:
+      - secret: ${BACKEND_SECRET}
+  database:
+    client: pg
+    connection:
+      host: ${POSTGRES_HOST}
+      port: ${POSTGRES_PORT}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+      database: ${POSTGRES_DATABASE:-backstage}
+
+auth:
+  environment: production
+  providers:
+    github:
+      production:
+        clientId: ${GITHUB_APP_CLIENT_ID}
+        clientSecret: ${GITHUB_APP_CLIENT_SECRET}
+        scopes:
+          - repo
+          - codespace
+          - read:org
+        signIn:
+          resolvers:
+            - resolver: usernameMatchingUserEntityName
+    microsoft:
+      production:
+        clientId: ${ENTRA_CLIENT_ID:-}
+        clientSecret: ${ENTRA_CLIENT_SECRET:-}
+        tenantId: ${ENTRA_TENANT_ID:-}
+        signIn:
+          resolvers:
+            - resolver: emailMatchingUserEntityProfileEmail
+
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}
+      apps:
+        - appId: ${GITHUB_APP_ID}
+          clientId: ${GITHUB_APP_CLIENT_ID}
+          clientSecret: ${GITHUB_APP_CLIENT_SECRET}
+          privateKey: ${GITHUB_APP_PRIVATE_KEY}
+
+proxy:
+  endpoints: {}
+
+techdocs:
+  builder: external
+  generator:
+    runIn: local
+  publisher:
+    type: azureBlobStorage
+    azureBlobStorage:
+      containerName: ${TECHDOCS_AZURE_BLOB_CONTAINER:-techdocs}
+      credentials:
+        accountName: ${TECHDOCS_AZURE_STORAGE_ACCOUNT}
+        accountKey: ${TECHDOCS_AZURE_STORAGE_ACCOUNT_KEY}
+
+scaffolder: {}
+
+catalog:
+  rules:
+    - allow:
+        [
+          Component,
+          System,
+          API,
+          Resource,
+          Location,
+          Domain,
+          Template,
+          User,
+          Group,
+        ]
+  locations:
+    # Organization Data
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/backstage/examples/org.yaml
+      rules:
+        - allow: [User, Group, Domain, System]
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/backstage/examples/entities.yaml
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/backstage/catalog-info.yaml
+    # AI Agent System
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/backstage/catalog/ai-agents.yaml
+      rules:
+        - allow: [System, Component]
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/backstage/catalog/ai-apis.yaml
+      rules:
+        - allow: [API]
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/backstage/catalog/mcp-servers.yaml
+      rules:
+        - allow: [Resource]
+    # Golden Path Templates - H1 Foundation
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/golden-paths/h1-foundation/basic-cicd/template.yaml
+      rules:
+        - allow: [Template]
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/golden-paths/h1-foundation/web-application/template.yaml
+      rules:
+        - allow: [Template]
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/golden-paths/h1-foundation/new-microservice/template.yaml
+      rules:
+        - allow: [Template]
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/golden-paths/h1-foundation/documentation-site/template.yaml
+      rules:
+        - allow: [Template]
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/golden-paths/h1-foundation/infrastructure-provisioning/template.yaml
+      rules:
+        - allow: [Template]
+    - type: url
+      target: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/blob/${GITHUB_BRANCH:-main}/golden-paths/h1-foundation/security-baseline/template.yaml
+      rules:
+        - allow: [Template]
+
+permission:
+  enabled: true
+
+kubernetes:
+  serviceLocatorMethod:
+    type: multiTenant
+  clusterLocatorMethods:
+    - type: config
+      clusters: []
