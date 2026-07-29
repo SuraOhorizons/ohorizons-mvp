@@ -1,0 +1,61 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+  description: Platform engineering team that owns the developer platform
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: platform-admin
+  annotations:
+    github.com/user-login: platform-admin
+spec:
+  profile:
+    displayName: Platform Admin
+    email: platform-admin@example.com
+  memberOf:
+    - platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: developer-user
+  annotations:
+    github.com/user-login: developer-user
+spec:
+  profile:
+    displayName: Developer User
+    email: developer-user@example.com
+  memberOf:
+    - platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: sre-user
+  annotations:
+    github.com/user-login: sre-user
+spec:
+  profile:
+    displayName: SRE User
+    email: sre-user@example.com
+  memberOf:
+    - platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: security-user
+  annotations:
+    github.com/user-login: security-user
+spec:
+  profile:
+    displayName: Security User
+    email: security-user@example.com
+  memberOf:
+    - platform-team
