@@ -59,3 +59,16 @@ spec:
     email: security-user@example.com
   memberOf:
     - platform-team
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: fcastril
+  annotations:
+    github.com/user-login: fcastril
+spec:
+  profile:
+    displayName: FCastril
+    email: fcastril@ohorizons.com
+  memberOf:
+    - platform-team
