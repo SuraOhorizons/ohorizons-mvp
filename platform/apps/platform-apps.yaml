@@ -1,0 +1,270 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: open-horizons-platform
+spec:
+  description: "Open Horizons Platform Components"
+  # Source repositories
+  sourceRepos:
+    - https://github.com/SuraOhorizons/ohorizons-mvp.git
+    - https://github.com/SuraOhorizons/ohorizons-mvp.git
+    - https://charts.jetstack.io
+    - https://kubernetes.github.io/ingress-nginx
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+    - https://jaegertracing.github.io/helm-charts
+    - https://charts.bitnami.com/bitnami
+    - registry-1.docker.io
+  # Destination clusters and namespaces
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+  # Cluster resources the project can manage
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: ''
+      kind: PersistentVolume
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: networking.k8s.io
+      kind: IngressClass
+    - group: storage.k8s.io
+      kind: StorageClass
+    - group: cert-manager.io
+      kind: ClusterIssuer
+    - group: monitoring.coreos.com
+      kind: '*'
+  # Namespace-scoped resources
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  # Roles for project members
+  roles:
+    - name: platform-admin
+      description: "Full access to platform project"
+      policies:
+        - p, proj:platform:platform-admin, applications, *, platform/*, allow
+        - p, proj:platform:platform-admin, repositories, *, platform/*, allow
+      groups:
+        - platform-admins
+    - name: platform-viewer
+      description: "Read-only access to platform project"
+      policies:
+        - p, proj:platform:platform-viewer, applications, get, platform/*, allow
+      groups:
+        - platform-viewers
+# =============================================================================
+# WAVE 1: CERT-MANAGER
+# =============================================================================
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.14.0
+    helm:
+      values: "installCRDs: true\n\nglobal:\n  leaderElection:\n    namespace: cert-manager\n    \nreplicaCount: 2\n\npodDisruptionBudget:\n  enabled: true\n  minAvailable: 1\n  \nresources:\n  requests:\n    cpu: 50m\n    memory: 64Mi\n  limits:\n    cpu: 200m\n    memory: 256Mi\n    \nprometheus:\n  enabled: true\n  servicemonitor:\n    enabled: true\n    \nwebhook:\n  replicaCount: 2\n  \ncainjector:\n  replicaCount: 2\n  \n"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+# =============================================================================
+# WAVE 2: INGRESS-NGINX
+# =============================================================================
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: 4.9.0
+    helm:
+      values: "controller:\n  replicaCount: 2\n  \n  service:\n    annotations:\n      service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: /healthz\n      \n  resources:\n    requests:\n      cpu: 100m\n      memory: 128Mi\n    limits:\n      cpu: 500m\n      memory: 512Mi\n      \n  autoscaling:\n    enabled: true\n    minReplicas: 2\n    maxReplicas: 10\n    targetCPUUtilizationPercentage: 80\n    \n  podDisruptionBudget:\n    enabled: true\n    minAvailable: 1\n    \n  metrics:\n    enabled: true\n    serviceMonitor:\n      enabled: true\n      \n  admissionWebhooks:\n    enabled: true\n    \n  config:\n    use-forwarded-headers: \"true\"\n    compute-full-forwarded-for: \"true\"\n    use-proxy-protocol: \"false\"\n    \ndefaultBackend:\n  enabled: true\n  replicaCount: 2\n  \n"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+# =============================================================================
+# WAVE 3: PROMETHEUS STACK
+# =============================================================================
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 56.0.0
+    helm:
+      skipCrds: false
+      values: "fullnameOverride: prometheus\n\nprometheus:\n  prometheusSpec:\n    retention: 30d\n    retentionSize: 45GB\n    \n    storageSpec:\n      volumeClaimTemplate:\n        spec:\n          storageClassName: managed-premium\n          accessModes: [\"ReadWriteOnce\"]\n          resources:\n            requests:\n              storage: 50Gi\n              \n    resources:\n      requests:\n        cpu: 500m\n        memory: 2Gi\n      limits:\n        cpu: 2\n        memory: 4Gi\n        \n    serviceMonitorSelectorNilUsesHelmValues: false\n    podMonitorSelectorNilUsesHelmValues: false\n    \n  ingress:\n    enabled: true\n    ingressClassName: nginx\n    hosts:\n      - prometheus.nttdatacolombia.com\n    tls:\n      - secretName: prometheus-tls\n        hosts:\n          - prometheus.nttdatacolombia.com\n          \nalertmanager:\n  alertmanagerSpec:\n    storage:\n      volumeClaimTemplate:\n        spec:\n          storageClassName: managed-premium\n          accessModes: [\"ReadWriteOnce\"]\n          resources:\n            requests:\n              storage: 10Gi\n              \n  ingress:\n    enabled: true\n    ingressClassName: nginx\n    hosts:\n      - alertmanager.nttdatacolombia.com\n    tls:\n      - secretName: alertmanager-tls\n        hosts:\n          - alertmanager.nttdatacolombia.com\n          \ngrafana:\n  enabled: true\n  admin:\n    existingSecret: grafana-admin-credentials\n    userKey: admin-user\n    passwordKey: admin-password\n  \n  persistence:\n    enabled: true\n    storageClassName: managed-premium\n    size: 10Gi\n    \n  ingress:\n    enabled: true\n    ingressClassName: nginx\n    hosts:\n      - grafana.nttdatacolombia.com\n    tls:\n      - secretName: grafana-tls\n        hosts:\n          - grafana.nttdatacolombia.com\n          \n  sidecar:\n    dashboards:\n      enabled: true\n      searchNamespace: ALL\n    datasources:\n      enabled: true\n      \n  dashboardProviders:\n    dashboardproviders.yaml:\n      apiVersion: 1\n      providers:\n        - name: 'default'\n          orgId: 1\n          folder: ''\n          type: file\n          disableDeletion: false\n          editable: true\n          options:\n            path: /var/lib/grafana/dashboards/default\n            \n  additionalDataSources:\n    - name: Jaeger\n      type: jaeger\n      url: http://jaeger-query.observability:16686\n      access: proxy\n      \nkubeStateMetrics:\n  enabled: true\n  \nnodeExporter:\n  enabled: true\n  \n"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+# =============================================================================
+# WAVE 3: JAEGER
+# =============================================================================
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jaeger
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://jaegertracing.github.io/helm-charts
+    chart: jaeger
+    targetRevision: 2.0.0
+    helm:
+      values: "provisionDataStore:\n  cassandra: false\n  elasticsearch: true\n  \nstorage:\n  type: elasticsearch\n  elasticsearch:\n    host: elasticsearch-master\n    port: 9200\n    \ncollector:\n  replicaCount: 2\n  resources:\n    requests:\n      cpu: 100m\n      memory: 128Mi\n    limits:\n      cpu: 500m\n      memory: 512Mi\n      \nquery:\n  replicaCount: 2\n  ingress:\n    enabled: true\n    ingressClassName: nginx\n    hosts:\n      - jaeger.nttdatacolombia.com\n    tls:\n      - secretName: jaeger-tls\n        hosts:\n          - jaeger.nttdatacolombia.com\n          \nagent:\n  daemonset:\n    useHostPort: true\n    \n"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+# =============================================================================
+# APPLICATION SET: TEAM NAMESPACES
+# =============================================================================
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: team-namespaces
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/SuraOhorizons/ohorizons-mvp.git
+        revision: main
+        files:
+          - path: "teams/*/team.yaml"
+  template:
+    metadata:
+      name: 'team-{{team.name}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/managed-by: argocd
+        open-horizons/team: '{{team.name}}'
+    spec:
+      project: platform
+      source:
+        repoURL: https://github.com/SuraOhorizons/ohorizons-mvp.git
+        targetRevision: main
+        path: 'teams/{{team.name}}/namespaces'
+      destination:
+        server: https://kubernetes.default.svc
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+# =============================================================================
+# APPLICATION SET: GOLDEN PATH APPLICATIONS
+# =============================================================================
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: golden-path-apps
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/SuraOhorizons/ohorizons-mvp.git
+        revision: main
+        directories:
+          - path: "teams/*/apps/*"
+  template:
+    metadata:
+      name: '{{path.basename}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/managed-by: argocd
+        open-horizons/golden-path: 'true'
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '{{path}}'
+    spec:
+      project: '{{path[1]}}' # Team name from path
+      source:
+        repoURL: https://github.com/SuraOhorizons/ohorizons-mvp.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
