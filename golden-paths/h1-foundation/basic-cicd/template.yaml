@@ -58,7 +58,7 @@ spec:
             allowedHosts:
               - github.com
             allowedOwners:
-              - ${{ parameters.orgName | default('your-org') }}
+              - ${{ parameters.orgName | default('SuraOhorizons') }}
 
         branch:
           title: Target Branch
