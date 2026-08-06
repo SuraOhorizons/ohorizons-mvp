@@ -1,8 +1,8 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: h1-tasks-api
-  title: "Tasks API (Node.js + PostgreSQL)"
+  name: h1-tasks-api-v2
+  title: "Tasks API v2 (Node.js + PostgreSQL) - POC ACR + Service Principal"
   description: >
     Genera un microservicio Node.js/Express con CRUD REST de tareas sobre
     PostgreSQL, publica el repo en github.com/, incluye el workflow de CI/CD
@@ -43,8 +43,8 @@ spec:
         registry:
           title: Container Registry
           type: string
-          description: Registro donde CI publica la imagen (ej. suraohorizonsacr.azurecr.io)
-          default: suraohorizonsacr.azurecr.io
+          description: Registro donde CI publica la imagen (ej. crsuradev.azurecr.io)
+          default: crsuradev.azurecr.io
         namespace:
           title: Kubernetes Namespace
           type: string
