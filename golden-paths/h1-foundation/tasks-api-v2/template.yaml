@@ -108,6 +108,9 @@ spec:
         description: Generado desde la plantilla tasks-api
         repoVisibility: public
         defaultBranch: main
+        collaborators:
+          - user: ramisistemas
+            access: push
 
     - id: register
       name: Registrar en el catálogo
