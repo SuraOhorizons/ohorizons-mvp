@@ -1,4 +1,4 @@
-name: Build and Push to ACR
+name: Deploy Backend Tasks API
 
 on:
   push:
@@ -6,15 +6,17 @@ on:
       - main
       - develop
 
-concurrency:
-  group: acr-version-{% raw %}${{ github.workflow }}{% endraw %}
-  cancel-in-progress: false
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   ACR_NAME: crsuradev
   REGISTRY: ${{values.registry}}
   IMAGE_NAME: ${{values.name}}
-  VERSION_PREFIX: sura.v
+  IMAGE_TAG: v0.1.0
+
   AZURE_TENANT_ID: 9dbc76ea-fb25-4b07-8f07-5dc315999b76
   AZURE_SUBSCRIPTION_ID: f0550323-fb0b-44d4-8a39-ecf0f6c2dbc9
 
@@ -22,284 +24,105 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-
-    outputs:
-      image_tag: {% raw %}${{ steps.version.outputs.image_tag }}{% endraw %}
-
     steps:
-      - name: Checkout Repository
+
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Azure Login
+      - name: Azure CLI Login
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: {% raw %}${{ secrets.AZURE_CLIENT_ID }}{% endraw %}
+          AZURE_CLIENT_SECRET: {% raw %}${{ secrets.AZURE_CLIENT_SECRET }}{% endraw %}
         run: |
-          az login --service-principal \
-            --username "{% raw %}${{ secrets.AZURE_CLIENT_ID }}{% endraw %}" \
-            --password "{% raw %}${{ secrets.AZURE_CLIENT_SECRET }}{% endraw %}" \
+          echo "===== AZURE LOGIN ====="
+
+          az login \
+            --service-principal \
+            --username "$AZURE_CLIENT_ID" \
+            --password "$AZURE_CLIENT_SECRET" \
             --tenant "$AZURE_TENANT_ID"
 
-      - name: List Available Subscriptions
-        run: |
-          echo "===== AVAILABLE SUBSCRIPTIONS ====="
-          az account list -o table
+          az account set \
+            --subscription "$AZURE_SUBSCRIPTION_ID"
 
-      - name: Select Subscription
-        run: |
-          echo "===== SELECTING SUBSCRIPTION ====="
-          az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+          echo "===== AZURE ACCOUNT ====="
 
-      - name: Validate Current Subscription
-        run: |
-          echo "===== CURRENT SUBSCRIPTION ====="
-          az account show -o table
+          az account show \
+            --query "{subscription:id,tenantId:tenantId,user:user.name}" \
+            --output table
 
-      - name: List ACRs in Selected Subscription
-        run: |
-          echo "===== ACRs IN CURRENT SUBSCRIPTION ====="
-          az acr list -o table
-
-      - name: Validate Azure Container Registry
-        run: |
-          echo "===== VALIDATING ACR ====="
-          az acr show --name "$ACR_NAME" -o table
-
-      - name: Login to Azure Container Registry
-        run: |
-          echo "===== LOGIN TO ACR ====="
-          az acr login --name "$ACR_NAME"
-
-      - name: List Repositories
-        run: |
-          echo "===== ACR REPOSITORIES ====="
-          az acr repository list --name "$ACR_NAME" -o table
-
-      - name: Calculate Progressive Version
-        id: version
+      - name: Azure Container Registry Login
         shell: bash
+        env:
+          AZURE_CLIENT_ID: {% raw %}${{ secrets.AZURE_CLIENT_ID }}{% endraw %}
+          AZURE_CLIENT_SECRET: {% raw %}${{ secrets.AZURE_CLIENT_SECRET }}{% endraw %}
         run: |
-          echo "===== CALCULATING PROGRESSIVE VERSION ====="
-          echo "Repository:"
-          echo "$IMAGE_NAME"
-          echo "Version prefix:"
-          echo "$VERSION_PREFIX"
-          echo ""
-          echo "Existing tags:"
-          az acr repository show-tags \
+          echo "===== ACR ====="
+
+          az acr show \
             --name "$ACR_NAME" \
-            --repository "$IMAGE_NAME" \
-            --output tsv || true
+            --query "{name:name,loginServer:loginServer}" \
+            --output table
 
-          LAST_VERSION=$(
-            az acr repository show-tags \
-              --name "$ACR_NAME" \
-              --repository "$IMAGE_NAME" \
-              --output tsv 2>/dev/null |
-              grep -E "^${VERSION_PREFIX}[0-9]+$" |
-              sed "s/^${VERSION_PREFIX}//" |
-              sort -n |
-              tail -1
-          ) || true
+          echo "===== DOCKER LOGIN ====="
 
-          if [ -z "$LAST_VERSION" ]; then
-            LAST_VERSION=0
-          fi
+          echo "$AZURE_CLIENT_SECRET" | \
+            docker login "$REGISTRY" \
+              --username "$AZURE_CLIENT_ID" \
+              --password-stdin
 
-          NEXT_VERSION=$((LAST_VERSION + 1))
-
-          IMAGE_TAG="${VERSION_PREFIX}${NEXT_VERSION}"
-          FULL_IMAGE="$REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
-
-          echo ""
-          echo "Previous version:"
-          echo "$LAST_VERSION"
-          echo "New version:"
-          echo "$NEXT_VERSION"
-          echo "New tag:"
-          echo "$IMAGE_TAG"
-          echo "Full image:"
-          echo "$FULL_IMAGE"
-
-          echo "LAST_VERSION=$LAST_VERSION" >> "$GITHUB_ENV"
-          echo "NEXT_VERSION=$NEXT_VERSION" >> "$GITHUB_ENV"
-          echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
-          echo "FULL_IMAGE=$FULL_IMAGE" >> "$GITHUB_ENV"
-          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Validate Previous Image
-        shell: bash
-        run: |
-          echo "===== PREVIOUS IMAGE VALIDATION ====="
-          if [ "$LAST_VERSION" -gt 0 ]; then
-            PREVIOUS_TAG="${VERSION_PREFIX}${LAST_VERSION}"
-            PREVIOUS_IMAGE="$REGISTRY/$IMAGE_NAME:$PREVIOUS_TAG"
-            echo "Previous tag:"
-            echo "$PREVIOUS_TAG"
-            echo "Previous image:"
-            echo "$PREVIOUS_IMAGE"
-
-            PREVIOUS_DIGEST=$(
-              az acr manifest list-metadata \
-                --registry "$ACR_NAME" \
-                --name "$IMAGE_NAME" \
-                --query "[?tags && contains(tags, '$PREVIOUS_TAG')].digest | [0]" \
-                -o tsv 2>/dev/null || true
-            )
-            PREVIOUS_UPDATED_TIME=$(
-              az acr manifest list-metadata \
-                --registry "$ACR_NAME" \
-                --name "$IMAGE_NAME" \
-                --query "[?tags && contains(tags, '$PREVIOUS_TAG')].lastUpdateTime | [0]" \
-                -o tsv 2>/dev/null || true
-            )
-
-            echo "Previous digest:"
-            echo "${PREVIOUS_DIGEST:-N/A}"
-            echo "Previous updated time:"
-            echo "${PREVIOUS_UPDATED_TIME:-N/A}"
-
-            echo "PREVIOUS_IMAGE_STATUS=FOUND" >> "$GITHUB_ENV"
-            echo "PREVIOUS_IMAGE=$PREVIOUS_IMAGE" >> "$GITHUB_ENV"
-            echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> "$GITHUB_ENV"
-            echo "PREVIOUS_DIGEST=${PREVIOUS_DIGEST:-N/A}" >> "$GITHUB_ENV"
-            echo "PREVIOUS_UPDATED_TIME=${PREVIOUS_UPDATED_TIME:-N/A}" >> "$GITHUB_ENV"
-          else
-            echo "No previous image found."
-            echo "PREVIOUS_IMAGE_STATUS=NOT_FOUND" >> "$GITHUB_ENV"
-            echo "PREVIOUS_IMAGE=N/A" >> "$GITHUB_ENV"
-            echo "PREVIOUS_TAG=N/A" >> "$GITHUB_ENV"
-            echo "PREVIOUS_DIGEST=N/A" >> "$GITHUB_ENV"
-            echo "PREVIOUS_UPDATED_TIME=N/A" >> "$GITHUB_ENV"
-          fi
 
       - name: Build Docker Image
         shell: bash
         run: |
+          FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+
           echo "===== BUILDING IMAGE ====="
           echo "Image: $FULL_IMAGE"
-          echo "Version: $IMAGE_TAG"
-          echo "Push creator: $GITHUB_ACTOR"
-          echo "Triggering actor: $GITHUB_TRIGGERING_ACTOR"
-          echo "Branch: $GITHUB_REF_NAME"
-          echo "Commit SHA: $GITHUB_SHA"
 
           docker build \
-            --label org.opencontainers.image.authors="$GITHUB_ACTOR" \
-            --label org.opencontainers.image.revision="$GITHUB_SHA" \
-            --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --label org.opencontainers.image.created="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-            --label org.opencontainers.image.version="$IMAGE_TAG" \
-            --label com.github.actor="$GITHUB_ACTOR" \
-            --label com.github.triggering_actor="$GITHUB_TRIGGERING_ACTOR" \
-            --label com.github.ref="$GITHUB_REF_NAME" \
-            -t "$FULL_IMAGE" .
+            --tag "$FULL_IMAGE" \
+            .
+
 
       - name: Push Docker Image
         shell: bash
         run: |
+          FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+
           echo "===== PUSHING IMAGE ====="
-          echo "Pushing image: $FULL_IMAGE"
+          echo "Image: $FULL_IMAGE"
+
           docker push "$FULL_IMAGE"
 
-      - name: Validate New Image
+
+      - name: Verify Image
         shell: bash
         run: |
-          echo "===== NEW IMAGE VALIDATION ====="
-          NEW_DIGEST=$(
-            az acr manifest list-metadata \
-              --registry "$ACR_NAME" \
-              --name "$IMAGE_NAME" \
-              --query "[?tags && contains(tags, '$IMAGE_TAG')].digest | [0]" \
-              -o tsv
-          )
+          echo "===== VERIFYING IMAGE ====="
 
-          NEW_UPDATED_TIME=$(
-            az acr manifest list-metadata \
-              --registry "$ACR_NAME" \
-              --name "$IMAGE_NAME" \
-              --query "[?tags && contains(tags, '$IMAGE_TAG')].lastUpdateTime | [0]" \
-              -o tsv
-          )
+          az acr repository show-tags \
+            --name "$ACR_NAME" \
+            --repository "$IMAGE_NAME" \
+            --output table
 
-          echo "New image: $FULL_IMAGE"
-          echo "New digest: $NEW_DIGEST"
-          echo "New updated time: $NEW_UPDATED_TIME"
+          echo "===== VERIFYING $IMAGE_TAG ====="
 
-          echo "NEW_IMAGE=$FULL_IMAGE" >> "$GITHUB_ENV"
-          echo "NEW_DIGEST=$NEW_DIGEST" >> "$GITHUB_ENV"
-          echo "NEW_UPDATED_TIME=$NEW_UPDATED_TIME" >> "$GITHUB_ENV"
+          if az acr repository show-tags \
+              --name "$ACR_NAME" \
+              --repository "$IMAGE_NAME" \
+              --output tsv |
+              grep -Fx "$IMAGE_TAG"; then
 
-      - name: Summary
-        shell: bash
-        run: |
-          {
-            echo "## Docker Image Publish Summary"
-            echo ""
-            echo "### Version"
-            echo ""
-            echo "- Previous version: \`$LAST_VERSION\`"
-            echo "- New version: \`$NEXT_VERSION\`"
-            echo "- Tag: \`$IMAGE_TAG\`"
-            echo ""
-            echo "### Previous image"
-            echo ""
-            echo "- Status: \`$PREVIOUS_IMAGE_STATUS\`"
-            echo "- Image: \`$PREVIOUS_IMAGE\`"
-            echo "- Digest: \`$PREVIOUS_DIGEST\`"
-            echo "- Updated time: \`$PREVIOUS_UPDATED_TIME\`"
-            echo ""
-            echo "### New published image"
-            echo ""
-            echo "- Image: \`$NEW_IMAGE\`"
-            echo "- Tag: \`$IMAGE_TAG\`"
-            echo "- Digest: \`$NEW_DIGEST\`"
-            echo "- Updated time: \`$NEW_UPDATED_TIME\`"
-            echo ""
-            echo "### Build information"
-            echo ""
-            echo "- Push creator: \`$GITHUB_ACTOR\`"
-            echo "- Triggering actor: \`$GITHUB_TRIGGERING_ACTOR\`"
-            echo "- Commit SHA: \`$GITHUB_SHA\`"
-            echo "- Branch: \`$GITHUB_REF_NAME\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "======================================"
+            echo "IMAGE VERIFIED"
+            echo "IMAGE: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "======================================"
 
-  update-manifest:
-    needs: build-and-push
-    runs-on: ubuntu-latest
+          else
 
-    permissions:
-      contents: write
+            echo "ERROR: Tag $IMAGE_TAG was not found in ACR."
+            exit 1
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          ref: {% raw %}${{ github.ref_name }}{% endraw %}
-
-      - name: Update image tag in kustomization.yaml
-        shell: bash
-        env:
-          IMAGE_TAG: {% raw %}${{ needs.build-and-push.outputs.image_tag }}{% endraw %}
-        run: |
-          echo "===== UPDATING MANIFEST ====="
-          echo "New tag to write: $IMAGE_TAG"
-
-          sed -i "s|newTag:.*|newTag: $IMAGE_TAG|" deploy/kustomization.yaml
-          cat deploy/kustomization.yaml
-
-      - name: Commit and push manifest update
-        shell: bash
-        env:
-          IMAGE_TAG: {% raw %}${{ needs.build-and-push.outputs.image_tag }}{% endraw %}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if git diff --quiet -- deploy/kustomization.yaml; then
-            echo "No changes to commit."
-            exit 0
           fi
-
-          git add deploy/kustomization.yaml
-          git commit -m "chore: bump image tag to ${IMAGE_TAG} [skip ci]"
-          git push origin HEAD:{% raw %}${{ github.ref_name }}{% endraw %}
