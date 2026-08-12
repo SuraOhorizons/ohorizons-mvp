@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: Backend Node.js generado desde el golden path base (agnóstico, sin lógica de negocio)
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}

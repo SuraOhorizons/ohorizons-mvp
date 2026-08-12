@@ -1,0 +1,96 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: h1-node
+  title: "Node.js (Skeleton agnóstico)"
+  description: >
+    Genera la estructura base de un backend Node.js (Express mínimo, sin
+    ninguna lógica ni dependencia de negocio agregada), publica el repo en
+    GitHub y registra el componente en el catálogo de Backstage. Pensada
+    como punto de partida genérico para cualquier caso de uso.
+  tags:
+    - h1-foundation
+    - nodejs
+    - backend
+    - skeleton
+spec:
+  owner: group:default/platform-engineering
+  type: service
+
+  parameters:
+    - title: Datos del proyecto
+      required:
+        - name
+        - owner
+      properties:
+        name:
+          title: Nombre del proyecto
+          type: string
+          description: Se usa en package.json, catalog-info.yaml y como nombre del repo nuevo en GitHub
+          default: node-service
+        owner:
+          title: Owner
+          type: string
+          description: Equipo o persona dueña del componente (se guarda en catalog-info.yaml)
+          default: group:default/platform-engineering
+
+    - title: CI/CD y despliegue
+      required:
+        - registry
+        - namespace
+      properties:
+        registry:
+          title: Container Registry
+          type: string
+          description: Registro donde CI publica la imagen (ej. crsuradev.azurecr.io)
+          default: crsuradev.azurecr.io
+        namespace:
+          title: Kubernetes Namespace
+          type: string
+          description: Namespace de AKS donde ArgoCD despliega el servicio
+          default: demo-ohorizons
+        system:
+          title: System
+          type: string
+          description: Sistema al que pertenece este servicio (etiqueta app.kubernetes.io/part-of)
+          default: openhorizons-demo
+
+  steps:
+    - id: fetch-app
+      name: Copiar código de la aplicación
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          registry: ${{ parameters.registry }}
+          namespace: ${{ parameters.namespace }}
+          system: ${{ parameters.system }}
+
+    - id: publish
+      name: Publicar en GitHub
+      action: publish:github
+      input:
+        repoUrl: github.com?repo=${{ parameters.name }}&owner=SuraOhorizons
+        description: Generado desde la plantilla base de Node.js
+        repoVisibility: public
+        defaultBranch: main
+        collaborators:
+          - user: ramisistemas
+            access: push
+
+    - id: register
+      name: Registrar en el catálogo
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Repositorio en GitHub
+        url: ${{ steps.publish.output.remoteUrl }}
+      - title: Abrir en el catálogo
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
