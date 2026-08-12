@@ -46,6 +46,8 @@ spec:
       kind: ClusterIssuer
     - group: monitoring.coreos.com
       kind: '*'
+    - group: external-secrets.io
+      kind: ClusterSecretStore
   # Namespace-scoped resources
   namespaceResourceWhitelist:
     - group: '*'
