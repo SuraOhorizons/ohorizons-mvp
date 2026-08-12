@@ -99,7 +99,7 @@ jobs:
               sed "s/^${VERSION_PREFIX}//" |
               sort -n |
               tail -1
-          )
+          ) || true
 
           if [ -z "$LAST_VERSION" ]; then
             LAST_VERSION=0
