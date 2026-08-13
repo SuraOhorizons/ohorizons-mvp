@@ -59,7 +59,7 @@ spec:
           title: Database Secret Key (Key Vault)
           type: string
           description: Nombre del secreto en Key Vault con la connection string de Postgres
-          default: tasksdb-connection-string
+          default: PostgreSuraOh
         allowedOrigin:
           title: CORS Allowed Origin
           type: string
