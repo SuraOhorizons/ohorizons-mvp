@@ -49,7 +49,7 @@ spec:
           title: Kubernetes Namespace
           type: string
           description: Namespace de AKS donde ArgoCD despliega el servicio
-          default: demo-ohorizons
+          default: default
         system:
           title: System
           type: string
@@ -59,7 +59,7 @@ spec:
           title: Database Secret Key (Key Vault)
           type: string
           description: Nombre del secreto en Key Vault con la connection string de Postgres
-          default: PostgreSuraOh
+          default: PostgreSuraOhConnectionString
         allowedOrigin:
           title: CORS Allowed Origin
           type: string

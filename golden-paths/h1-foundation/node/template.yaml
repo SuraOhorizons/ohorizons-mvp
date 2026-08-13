@@ -48,7 +48,7 @@ spec:
           title: Kubernetes Namespace
           type: string
           description: Namespace de AKS donde ArgoCD despliega el servicio
-          default: demo-ohorizons
+          default: default
         system:
           title: System
           type: string
