@@ -32,7 +32,7 @@ spec:
           title: Owner
           type: string
           description: Equipo o persona dueña del componente (se guarda en catalog-info.yaml)
-          default: group:default/platform-engineering
+          default: platform-engineering
 
     - title: CI/CD y despliegue
       required:
