@@ -1,0 +1,212 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: mcp-ecosystem
+  title: MCP Ecosystem Server (Full)
+  description: |
+    Creates a complete MCP Ecosystem Server with all 17 tool modules:
+    - Group A (Agent & AI): spec-kit, anthropics-skills, agent-framework, gh-aw, agents-md, github-copilot-docs
+    - Group B (Backstage): backstage-docs, backstage-plugins, backstage-ui, spotify-backstage, backstage-org
+    - Group C (Official docs): microsoft-learn, vscode-docs, github-docs, anthropic-docs, azure-caf, azure-waf
+    - Streamable HTTP transport, Docker, Kubernetes-ready
+  tags:
+    - mcp
+    - ai
+    - ecosystem
+    - typescript
+    - h3-innovation
+spec:
+  owner: platform-team
+  type: service
+
+  parameters:
+    - title: Server Configuration
+      required:
+        - name
+        - owner
+      properties:
+        name:
+          title: Server Name
+          type: string
+          description: Unique name for your MCP ecosystem server (lowercase, hyphens)
+          pattern: '^[a-z0-9-]+$'
+          default: mcp-ecosystem
+          ui:autofocus: true
+        owner:
+          title: Owner Team
+          type: string
+          ui:field: OwnerPicker
+        description:
+          title: Description
+          type: string
+          description: What does this MCP ecosystem server provide?
+          default: Unified MCP server exposing tools from multiple AI and Backstage knowledge sources
+          ui:widget: textarea
+        port:
+          title: Server Port
+          type: integer
+          default: 3100
+          description: HTTP port for the MCP server
+
+    - title: Tool Modules
+      properties:
+        # Group A - Agent & AI frameworks
+        enable_spec_kit:
+          title: Spec-Kit (Spec-Driven Development)
+          type: boolean
+          default: true
+        enable_anthropics_skills:
+          title: Anthropic Skills (Agent Skills format)
+          type: boolean
+          default: true
+        enable_agent_framework:
+          title: Microsoft Agent Framework
+          type: boolean
+          default: true
+        enable_gh_aw:
+          title: GitHub Agentic Workflows
+          type: boolean
+          default: true
+        enable_agents_md:
+          title: AGENTS.md Format Reference
+          type: boolean
+          default: true
+        enable_github_copilot_docs:
+          title: GitHub Copilot Docs
+          type: boolean
+          default: true
+        # Group B - Backstage ecosystem
+        enable_backstage_docs:
+          title: Backstage Docs
+          type: boolean
+          default: true
+        enable_backstage_plugins:
+          title: Backstage Plugins Registry
+          type: boolean
+          default: true
+        enable_backstage_ui:
+          title: Backstage UI Design System
+          type: boolean
+          default: true
+        enable_spotify_backstage:
+          title: Spotify Backstage Docs
+          type: boolean
+          default: true
+        enable_backstage_org:
+          title: Backstage Org Repos
+          type: boolean
+          default: true
+        # Group C - Official documentation
+        enable_microsoft_learn:
+          title: Microsoft Learn (federated - Azure/AKS/AI Foundry/CAF/WAF)
+          type: boolean
+          default: true
+        enable_vscode_docs:
+          title: VS Code Docs
+          type: boolean
+          default: true
+        enable_github_docs:
+          title: GitHub Docs (Actions/GHAS/OIDC/Packages)
+          type: boolean
+          default: true
+        enable_anthropic_docs:
+          title: Anthropic / Claude Docs
+          type: boolean
+          default: true
+        enable_azure_caf:
+          title: Azure Cloud Adoption Framework (CAF)
+          type: boolean
+          default: true
+        enable_azure_waf:
+          title: Azure Well-Architected Framework (WAF)
+          type: boolean
+          default: true
+
+    - title: Infrastructure
+      properties:
+        hosting:
+          title: Hosting Platform
+          type: string
+          enum:
+            - docker_compose
+            - kubernetes
+          enumNames:
+            - Docker Compose
+            - Kubernetes (AKS)
+          default: docker_compose
+
+    - title: GitHub Repository
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+
+    - title: Azure Deployment
+      description: Optional Azure infrastructure baseline
+      properties:
+        deployToAzure:
+          title: Provision Azure Infrastructure
+          description: |
+            When enabled, the generated repository receives a Bicep baseline
+            (Log Analytics, Application Insights, Storage) plus a GitHub Actions
+            workflow that runs what-if or apply via OIDC. Disable for repos that
+            do not deploy to Azure.
+          type: boolean
+          default: true
+
+  steps:
+    - id: fetch-template
+      name: Fetch MCP Ecosystem Template
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          description: ${{ parameters.description }}
+          port: ${{ parameters.port }}
+
+
+    # --------------------------------------------------------------------------
+    # Generate Azure Infrastructure Baseline
+    # --------------------------------------------------------------------------
+    - id: add-azure-infrastructure
+      name: Add Azure Infrastructure Baseline
+      if: "${{ parameters.deployToAzure }}"
+      action: fetch:template
+      input:
+        url: ../../common/azure-infrastructure
+        targetPath: .
+        values:
+          name: "${{ parameters.name }}"
+          environment: dev
+          azureRegion: centralus
+          workloadType: "mcp-ecosystem"
+    - id: publish
+      name: Publish to GitHub
+      action: publish:github
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        repoVisibility: public
+        defaultBranch: main
+
+    - id: register
+      name: Register in Catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
