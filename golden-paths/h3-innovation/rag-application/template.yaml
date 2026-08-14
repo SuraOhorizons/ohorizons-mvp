@@ -319,14 +319,23 @@ spec:
     # -------------------------------------------------------------------------
     - title: Repository Settings
       required:
+        - repoUrl
         - repoName
       properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+
         repoName:
           title: Repository Name
           type: string
           description: GitHub repository name
           pattern: '^[a-z][a-z0-9-]{2,50}$'
-          
+
         visibility:
           title: Repository Visibility
           type: string
