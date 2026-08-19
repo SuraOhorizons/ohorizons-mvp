@@ -198,8 +198,11 @@ spec:
         repoUrl: github.com?repo=${{ parameters.name }}&owner=SuraOhorizons
         description: ${{ parameters.description }}
         defaultBranch: main
-        repoVisibility: internal
+        repoVisibility: public
         protectDefaultBranch: true
+        collaborators:
+          - user: ramisistemas
+            access: push
 
     - id: register
       name: Registrar en el catálogo
