@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: grafana-dashboards
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: open-horizons-platform
+data:
+  azure-prometheus.yaml: |
+    apiVersion: 1
+
+    datasources:
+      - name: Azure Managed Prometheus
+        uid: azure-managed-prometheus
+        type: grafana-azureprometheus-datasource
+        access: proxy
+        url: https://amw-sura-dev-dzcpd2e0f2a9aee3.eastus2.prometheus.monitor.azure.com
+
+        jsonData:
+          azureCredentials:
+            authType: workloadidentity
+            azureCloud: AzureCloud
+            clientId: 593cd07d-f0bf-47e9-83f8-6f7862d12e82
+            tenantId: 9dbc76ea-fb25-4b07-8f07-5dc315999b76
+
+          httpMethod: POST
+
+        isDefault: true
+        editable: false

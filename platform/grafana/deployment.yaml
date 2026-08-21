@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: grafana-dashboards
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: open-horizons-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: grafana
+
+      securityContext:
+        fsGroup: 472
+
+      containers:
+        - name: grafana
+          image: grafana/grafana:12.1.1
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+
+            - name: GF_AZURE_WORKLOAD_IDENTITY_ENABLED
+              value: "true"
+
+            - name: GF_AZURE_WORKLOAD_IDENTITY_CLIENT_ID
+              value: "593cd07d-f0bf-47e9-83f8-6f7862d12e82"
+
+            - name: GF_AZURE_WORKLOAD_IDENTITY_TENANT_ID
+              value: "9dbc76ea-fb25-4b07-8f07-5dc315999b76"
+
+            - name: GF_AZURE_WORKLOAD_IDENTITY_TOKEN_FILE
+              value: /var/run/secrets/azure/tokens/azure-identity-token
+
+            - name: GF_INSTALL_PLUGINS
+              value: grafana-azureprometheus-datasource
+
+            - name: GF_AZURE_FORWARD_SETTINGS_TO_PLUGINS
+              value: grafana-azureprometheus-datasource
+
+            - name: GF_AUTH_AZURE_AUTH_ENABLED
+              value: "true"
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          volumeMounts:
+            - name: grafana-datasources
+              mountPath: /etc/grafana/provisioning/datasources/azure-prometheus.yaml
+              subPath: azure-prometheus.yaml
+              readOnly: true
+
+      volumes:
+        - name: grafana-datasources
+          configMap:
+            name: grafana-datasources
