@@ -288,7 +288,7 @@ spec:
 
   source:
     repoURL: https://github.com/SuraOhorizons/ohorizons-mvp.git
-    targetRevision: main
+    targetRevision: migration/sura-open-horizons-root
     path: platform/backstage
 
   destination:
