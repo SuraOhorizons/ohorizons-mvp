@@ -26,6 +26,12 @@ locals {
     "open-horizons-environment" = var.environment
     "open-horizons-component"   = "security"
   })
+
+  key_vault_id = var.use_existing_key_vault ? data.azurerm_key_vault.existing[0].id : azurerm_key_vault.main[0].id
+
+  key_vault_name = var.use_existing_key_vault ? data.azurerm_key_vault.existing[0].name : azurerm_key_vault.main[0].name
+
+  key_vault_uri = var.use_existing_key_vault ? data.azurerm_key_vault.existing[0].vault_uri : azurerm_key_vault.main[0].vault_uri
 }
 
 # =============================================================================
@@ -38,7 +44,15 @@ data "azurerm_client_config" "current" {}
 # KEY VAULT
 # =============================================================================
 
+data "azurerm_key_vault" "existing" {
+  count               = var.use_existing_key_vault ? 1 : 0
+  name                = var.existing_key_vault_name
+  resource_group_name = var.resource_group_name
+}
+
 resource "azurerm_key_vault" "main" {
+  count = var.use_existing_key_vault ? 0 : 1
+
   name                = substr("kv-${local.name_prefix}", 0, 24)
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -71,7 +85,7 @@ resource "azurerm_private_endpoint" "key_vault" {
 
   private_service_connection {
     name                           = "kv-connection"
-    private_connection_resource_id = azurerm_key_vault.main.id
+    private_connection_resource_id = local.key_vault_id
     is_manual_connection           = false
     subresource_names              = ["vault"]
   }
@@ -88,14 +102,14 @@ resource "azurerm_private_endpoint" "key_vault" {
 resource "azurerm_role_assignment" "kv_admin" {
   count = var.admin_group_id != "" ? 1 : 0
 
-  scope                = azurerm_key_vault.main.id
+  scope                = local.key_vault_id
   role_definition_name = "Key Vault Administrator"
   principal_id         = var.admin_group_id
 }
 
 # Key Vault Administrator role for current deployment identity
 resource "azurerm_role_assignment" "kv_admin_deployer" {
-  scope                = azurerm_key_vault.main.id
+  scope                = local.key_vault_id
   role_definition_name = "Key Vault Administrator"
   principal_id         = data.azurerm_client_config.current.object_id
 }
@@ -118,7 +132,7 @@ resource "azurerm_user_assigned_identity" "workload" {
 resource "azurerm_role_assignment" "workload_kv" {
   for_each = var.workload_identities
 
-  scope                = azurerm_key_vault.main.id
+  scope                = local.key_vault_id
   role_definition_name = each.value.key_vault_role
   principal_id         = azurerm_user_assigned_identity.workload[each.key].principal_id
 }
@@ -172,7 +186,7 @@ resource "azurerm_user_assigned_identity" "external_secrets" {
 }
 
 resource "azurerm_role_assignment" "external_secrets_kv" {
-  scope                = azurerm_key_vault.main.id
+  scope                = local.key_vault_id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.external_secrets.principal_id
 }
@@ -261,7 +275,7 @@ resource "azurerm_key_vault_secret" "aad_client_id" {
 
   name         = "aad-client-id"
   value        = azuread_application.github_sso[0].client_id
-  key_vault_id = azurerm_key_vault.main.id
+  key_vault_id = local.key_vault_id
 
   tags = local.common_tags
 
@@ -273,7 +287,7 @@ resource "azurerm_key_vault_secret" "aad_client_secret" {
 
   name         = "aad-client-secret"
   value        = azuread_application_password.github_sso[0].value
-  key_vault_id = azurerm_key_vault.main.id
+  key_vault_id = local.key_vault_id
 
   tags = local.common_tags
 
@@ -288,7 +302,7 @@ resource "azurerm_monitor_diagnostic_setting" "key_vault" {
   count = lookup(var.tags, "log_analytics_workspace_id", "") != "" ? 1 : 0
 
   name                       = "kv-diagnostics"
-  target_resource_id         = azurerm_key_vault.main.id
+  target_resource_id         = local.key_vault_id
   log_analytics_workspace_id = lookup(var.tags, "log_analytics_workspace_id", null)
 
   enabled_log {

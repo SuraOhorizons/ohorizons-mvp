@@ -8,12 +8,12 @@
 
 output "resource_group_name" {
   description = "Name of the resource group"
-  value       = azurerm_resource_group.main.name
+  value       = local.platform_resource_group_name
 }
 
 output "resource_group_id" {
   description = "ID of the resource group"
-  value       = azurerm_resource_group.main.id
+  value       = local.platform_resource_group_id
 }
 
 # -----------------------------------------------------------------------------
@@ -126,7 +126,7 @@ output "next_steps" {
     Next Steps:
 
     1. Get AKS credentials:
-       az aks get-credentials --resource-group ${azurerm_resource_group.main.name} --name ${module.aks.cluster_name}
+       az aks get-credentials --resource-group ${local.platform_resource_group_name} --name ${module.aks.cluster_name}
 
     2. Verify cluster:
        kubectl get nodes

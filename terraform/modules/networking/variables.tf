@@ -76,3 +76,27 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "use_existing_network" {
+  description = "Use an existing Azure VNet and subnets."
+  type        = bool
+  default     = false
+}
+
+variable "existing_vnet_name" {
+  description = "Existing Azure VNet name."
+  type        = string
+  default     = ""
+}
+
+variable "existing_subnet_ids" {
+  description = "Existing subnet IDs keyed by platform purpose."
+  type        = map(string)
+  default     = {}
+}
+
+variable "existing_private_dns_zone_ids" {
+  description = "Existing Private DNS Zone IDs keyed by service."
+  type        = map(string)
+  default     = {}
+}

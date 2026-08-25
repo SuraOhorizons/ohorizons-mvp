@@ -1,26 +1,26 @@
 output "key_vault_id" {
   description = "Key Vault ID"
-  value       = azurerm_key_vault.main.id
+  value       = local.key_vault_id
 }
 
 output "key_vault_name" {
   description = "Key Vault name"
-  value       = azurerm_key_vault.main.name
+  value       = local.key_vault_name
 }
 
 output "key_vault_uri" {
   description = "Key Vault URI"
-  value       = azurerm_key_vault.main.vault_uri
+  value       = local.key_vault_uri
 }
 
 output "keyvault_name" {
   description = "Key Vault name (alias)"
-  value       = azurerm_key_vault.main.name
+  value       = local.key_vault_name
 }
 
 output "keyvault_uri" {
   description = "Key Vault URI (alias)"
-  value       = azurerm_key_vault.main.vault_uri
+  value       = local.key_vault_uri
 }
 
 output "workload_identity_client_ids" {

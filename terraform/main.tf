@@ -191,10 +191,23 @@ locals {
 # RESOURCE GROUP
 # =============================================================================
 
+data "azurerm_resource_group" "existing" {
+  count = var.use_existing_infrastructure ? 1 : 0
+
+  name = var.existing_resource_group_name
+}
+
 resource "azurerm_resource_group" "main" {
+  count = var.use_existing_infrastructure ? 0 : 1
+
   name     = "rg-${local.name_prefix}"
   location = var.location
   tags     = local.common_tags
+}
+
+locals {
+  platform_resource_group_name = var.use_existing_infrastructure ? data.azurerm_resource_group.existing[0].name : azurerm_resource_group.main[0].name
+  platform_resource_group_id   = var.use_existing_infrastructure ? data.azurerm_resource_group.existing[0].id : azurerm_resource_group.main[0].id
 }
 
 # =============================================================================
@@ -207,7 +220,7 @@ module "networking" {
   customer_name       = var.customer_name
   environment         = var.environment
   location            = var.location
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = local.platform_resource_group_name
 
   vnet_cidr = "10.0.0.0/16"
 
@@ -239,7 +252,7 @@ module "security" {
   customer_name       = var.customer_name
   environment         = var.environment
   location            = var.location
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = local.platform_resource_group_name
   tenant_id           = var.azure_tenant_id
   portal_domain_name  = var.domain_name
 
@@ -294,7 +307,7 @@ module "aks" {
   customer_name       = var.customer_name
   environment         = var.environment
   location            = var.location
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = local.platform_resource_group_name
 
   # Pin a currently supported AKS minor (Azure supports N, N-1, N-2).
   # 1.29/1.30 are end-of-life. Validate availability per region with
@@ -383,7 +396,7 @@ module "databases" {
   customer_name       = var.customer_name
   environment         = var.environment
   location            = var.location
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = local.platform_resource_group_name
 
   subnet_id                  = module.networking.subnet_ids.private_endpoints
   postgres_subnet_id         = module.networking.subnet_ids.postgres
@@ -437,7 +450,7 @@ module "observability" {
   customer_name       = var.customer_name
   environment         = var.environment
   location            = var.location
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = local.platform_resource_group_name
 
   aks_cluster_id = module.aks.cluster_id
 
@@ -502,7 +515,7 @@ module "container_registry" {
   customer_name       = var.customer_name
   environment         = var.environment
   location            = var.location
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = local.platform_resource_group_name
 
   sku                            = var.deployment_mode == "express" ? "Standard" : "Premium"
   subnet_id                      = module.networking.subnet_ids.private_endpoints
@@ -525,7 +538,7 @@ module "external_secrets" {
   customer_name       = var.customer_name
   environment         = var.environment
   location            = var.location
-  resource_group_name = azurerm_resource_group.main.name
+  resource_group_name = local.platform_resource_group_name
   aks_cluster_name    = module.aks.cluster_name
   key_vault_id        = module.security.key_vault_id
   key_vault_uri       = module.security.key_vault_uri

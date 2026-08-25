@@ -134,3 +134,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "use_existing_postgresql" {
+  description = "Use an existing Azure PostgreSQL Flexible Server."
+  type        = bool
+  default     = false
+}
+
+variable "existing_postgresql_name" {
+  description = "Existing PostgreSQL Flexible Server name."
+  type        = string
+  default     = ""
+}

@@ -47,10 +47,21 @@ locals {
 }
 
 # =============================================================================
+# EXISTING NETWORK DATA
+# =============================================================================
+
+data "azurerm_virtual_network" "existing" {
+  count               = var.use_existing_network ? 1 : 0
+  name                = var.existing_vnet_name
+  resource_group_name = var.resource_group_name
+}
+
+# =============================================================================
 # VIRTUAL NETWORK
 # =============================================================================
 
 resource "azurerm_virtual_network" "main" {
+  count               = var.use_existing_network ? 0 : 1
   name                = "vnet-${local.name_prefix}"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -65,9 +76,10 @@ resource "azurerm_virtual_network" "main" {
 
 # AKS Nodes Subnet
 resource "azurerm_subnet" "aks_nodes" {
+  count                = var.use_existing_network ? 0 : 1
   name                 = "snet-aks-nodes"
   resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = azurerm_virtual_network.main[0].name
   address_prefixes     = [var.subnet_config.aks_nodes_cidr]
   service_endpoints    = ["Microsoft.KeyVault"]
 
@@ -75,9 +87,10 @@ resource "azurerm_subnet" "aks_nodes" {
 
 # AKS Pods Subnet (for Azure CNI with dynamic IP allocation)
 resource "azurerm_subnet" "aks_pods" {
+  count                = var.use_existing_network ? 0 : 1
   name                 = "snet-aks-pods"
   resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = azurerm_virtual_network.main[0].name
   address_prefixes     = [var.subnet_config.aks_pods_cidr]
   service_endpoints    = ["Microsoft.KeyVault"]
 
@@ -85,9 +98,10 @@ resource "azurerm_subnet" "aks_pods" {
 
 # PostgreSQL Flexible Server delegated subnet
 resource "azurerm_subnet" "postgres" {
+  count                = var.use_existing_network ? 0 : 1
   name                 = "snet-postgres"
   resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = azurerm_virtual_network.main[0].name
   address_prefixes     = [var.subnet_config.postgres_cidr]
 
   delegation {
@@ -101,9 +115,10 @@ resource "azurerm_subnet" "postgres" {
 
 # Private Endpoints Subnet
 resource "azurerm_subnet" "private_endpoints" {
+  count                = var.use_existing_network ? 0 : 1
   name                 = "snet-private-endpoints"
   resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = azurerm_virtual_network.main[0].name
   address_prefixes     = [var.subnet_config.private_endpoints_cidr]
   service_endpoints    = ["Microsoft.ContainerRegistry", "Microsoft.KeyVault"]
 
@@ -112,21 +127,21 @@ resource "azurerm_subnet" "private_endpoints" {
 
 # Azure Bastion Subnet (if enabled)
 resource "azurerm_subnet" "bastion" {
-  count = var.enable_bastion ? 1 : 0
+  count = var.enable_bastion && !var.use_existing_network ? 1 : 0
 
   name                 = "AzureBastionSubnet" # Must be this exact name
   resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = azurerm_virtual_network.main[0].name
   address_prefixes     = [var.subnet_config.bastion_cidr]
 }
 
 # Application Gateway Subnet (if enabled)
 resource "azurerm_subnet" "app_gateway" {
-  count = var.enable_app_gateway ? 1 : 0
+  count = var.enable_app_gateway && !var.use_existing_network ? 1 : 0
 
   name                 = "snet-app-gateway"
   resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.main.name
+  virtual_network_name = azurerm_virtual_network.main[0].name
   address_prefixes     = [var.subnet_config.app_gateway_cidr]
 }
 
@@ -136,6 +151,7 @@ resource "azurerm_subnet" "app_gateway" {
 
 # AKS Nodes NSG
 resource "azurerm_network_security_group" "aks_nodes" {
+  count               = var.use_existing_network ? 0 : 1
   name                = "nsg-aks-nodes-${local.name_prefix}"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -196,12 +212,14 @@ resource "azurerm_network_security_group" "aks_nodes" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "aks_nodes" {
-  subnet_id                 = azurerm_subnet.aks_nodes.id
-  network_security_group_id = azurerm_network_security_group.aks_nodes.id
+  count                     = var.use_existing_network ? 0 : 1
+  subnet_id                 = azurerm_subnet.aks_nodes[0].id
+  network_security_group_id = azurerm_network_security_group.aks_nodes[0].id
 }
 
 # Private Endpoints NSG
 resource "azurerm_network_security_group" "private_endpoints" {
+  count               = var.use_existing_network ? 0 : 1
   name                = "nsg-private-endpoints-${local.name_prefix}"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -236,8 +254,9 @@ resource "azurerm_network_security_group" "private_endpoints" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "private_endpoints" {
-  subnet_id                 = azurerm_subnet.private_endpoints.id
-  network_security_group_id = azurerm_network_security_group.private_endpoints.id
+  count                     = var.use_existing_network ? 0 : 1
+  subnet_id                 = azurerm_subnet.private_endpoints[0].id
+  network_security_group_id = azurerm_network_security_group.private_endpoints[0].id
 }
 
 # =============================================================================
@@ -245,7 +264,7 @@ resource "azurerm_subnet_network_security_group_association" "private_endpoints"
 # =============================================================================
 
 resource "azurerm_private_dns_zone" "zones" {
-  for_each = local.private_dns_zones
+  for_each = var.use_existing_network ? {} : local.private_dns_zones
 
   name                = each.value
   resource_group_name = var.resource_group_name
@@ -255,12 +274,12 @@ resource "azurerm_private_dns_zone" "zones" {
 
 # Link private DNS zones to VNet
 resource "azurerm_private_dns_zone_virtual_network_link" "links" {
-  for_each = local.private_dns_zones
+  for_each = var.use_existing_network ? {} : local.private_dns_zones
 
   name                  = "link-${each.key}-${local.name_prefix}"
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.zones[each.key].name
-  virtual_network_id    = azurerm_virtual_network.main.id
+  virtual_network_id    = azurerm_virtual_network.main[0].id
   registration_enabled  = false
 
   tags = local.common_tags
@@ -284,7 +303,7 @@ resource "azurerm_dns_zone" "public" {
 # =============================================================================
 
 resource "azurerm_public_ip" "bastion" {
-  count = var.enable_bastion ? 1 : 0
+  count = var.enable_bastion && !var.use_existing_network ? 1 : 0
 
   name                = "pip-bastion-${local.name_prefix}"
   location            = var.location
@@ -296,7 +315,7 @@ resource "azurerm_public_ip" "bastion" {
 }
 
 resource "azurerm_bastion_host" "main" {
-  count = var.enable_bastion ? 1 : 0
+  count = var.enable_bastion && !var.use_existing_network ? 1 : 0
 
   name                = "bastion-${local.name_prefix}"
   location            = var.location

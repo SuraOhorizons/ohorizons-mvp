@@ -276,3 +276,61 @@ variable "alert_emails" {
   type        = list(string)
   default     = []
 }
+
+# -----------------------------------------------------------------------------
+# EXISTING INFRASTRUCTURE
+# -----------------------------------------------------------------------------
+
+variable "use_existing_infrastructure" {
+  description = "Use existing customer infrastructure instead of creating foundational Azure resources."
+  type        = bool
+  default     = false
+}
+
+variable "existing_resource_group_name" {
+  description = "Existing Azure Resource Group used by the platform."
+  type        = string
+  default     = ""
+}
+
+variable "existing_vnet_name" {
+  description = "Existing Azure Virtual Network."
+  type        = string
+  default     = ""
+}
+
+variable "existing_aks_name" {
+  description = "Existing AKS cluster."
+  type        = string
+  default     = ""
+}
+
+variable "existing_key_vault_name" {
+  description = "Existing Azure Key Vault."
+  type        = string
+  default     = ""
+}
+
+variable "existing_postgresql_name" {
+  description = "Existing PostgreSQL Flexible Server."
+  type        = string
+  default     = ""
+}
+
+variable "existing_redis_name" {
+  description = "Existing Azure Managed Redis resource."
+  type        = string
+  default     = ""
+}
+
+variable "existing_servicebus_namespace_name" {
+  description = "Existing Service Bus namespace."
+  type        = string
+  default     = ""
+}
+
+variable "existing_storage_account_names" {
+  description = "Existing Storage Accounts used by the platform."
+  type        = list(string)
+  default     = []
+}

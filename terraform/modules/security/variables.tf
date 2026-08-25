@@ -127,3 +127,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "use_existing_key_vault" {
+  description = "Use an existing Azure Key Vault."
+  type        = bool
+  default     = false
+}
+
+variable "existing_key_vault_name" {
+  description = "Existing Azure Key Vault name."
+  type        = string
+  default     = ""
+}

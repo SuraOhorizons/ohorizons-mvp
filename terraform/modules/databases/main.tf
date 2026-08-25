@@ -38,6 +38,16 @@ locals {
 }
 
 # =============================================================================
+# EXISTING POSTGRESQL
+# =============================================================================
+
+data "azurerm_postgresql_flexible_server" "existing" {
+  count               = var.use_existing_postgresql ? 1 : 0
+  name                = var.existing_postgresql_name
+  resource_group_name = var.resource_group_name
+}
+
+# =============================================================================
 # RANDOM PASSWORD GENERATION
 # =============================================================================
 
