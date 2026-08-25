@@ -1,0 +1,19 @@
+# Terraform local state and runtime
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/crash.log
+**/crash.*.log
+
+# Local Terraform variables
+**/*.tfvars
+**/*.tfvars.json
+
+# Local backend configuration
+terraform/backend.tf
+
+# Local/editor/OS files
+.DS_Store
+*.swp
+*.swo

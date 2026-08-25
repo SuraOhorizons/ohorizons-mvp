@@ -1,0 +1,194 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-app-config
+  namespace: backstage
+  labels:
+    app.kubernetes.io/name: backstage
+    app.kubernetes.io/part-of: sura-ohorizons
+data:
+  app-config.override.yaml: |-
+    app:
+      title: Sura Open Horizons — Agentic DevOps Platform
+      baseUrl: https://backstage.nttdatacolombia.com
+    
+    organization:
+      name: Sura Open Horizons
+    
+    platform:
+      githubRepository: SuraOhorizons/ohorizons-mvp
+    
+    backend:
+      baseUrl: https://backstage.nttdatacolombia.com
+      listen:
+        port: 7007
+      auth:
+        externalAccess:
+          - type: static
+            options:
+              token: ${BACKEND_SECRET}
+              subject: external
+        keys:
+          - secret: ${BACKEND_SECRET}
+      database:
+        client: pg
+        connection:
+          host: ${POSTGRES_HOST}
+          port: ${POSTGRES_PORT:-5432}
+          user: ${POSTGRES_USER}
+          password: ${POSTGRES_PASSWORD}
+          database: ${POSTGRES_DATABASE:-backstage}
+          ssl: true
+      csp:
+        connect-src: ["'self'", 'http:', 'https:']
+        img-src: ["'self'", 'data:', 'https://avatars.githubusercontent.com', 'https://*.githubusercontent.com']
+      cors:
+        origin: https://backstage.nttdatacolombia.com
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
+    
+    integrations:
+      github:
+        - host: github.com
+          token: ${GITHUB_TOKEN}
+    
+    proxy:
+      endpoints:
+        '/github/api':
+          target: 'https://api.github.com'
+          headers:
+            Authorization: 'Bearer ${GITHUB_TOKEN}'
+            Accept: 'application/vnd.github+json'
+            X-GitHub-Api-Version: '2022-11-28'
+          changeOrigin: true
+          allowedMethods: ['GET']
+          credentials: forward
+        '/github-api':
+          target: 'https://api.github.com'
+          headers:
+            Authorization: 'Bearer ${GITHUB_TOKEN}'
+            Accept: 'application/vnd.github+json'
+            X-GitHub-Api-Version: '2022-11-28'
+          changeOrigin: true
+          allowedMethods: ['GET']
+          credentials: forward
+        '/agent-api':
+          target: '${AGENT_API_URL:-http://sura-ohorizons-agent-api.ai-services.svc.cluster.local:8008}'
+          changeOrigin: true
+          allowedMethods: ['GET', 'POST']
+          credentials: forward
+        '/ai-impact':
+          target: '${AI_IMPACT_API_URL:-http://sura-ohorizons-agent-api-impact.ai-services.svc.cluster.local:8011}'
+          changeOrigin: true
+          allowedMethods: ['GET', 'POST']
+          credentials: forward
+        '/argocd/api':
+          target: '${ARGOCD_BASE_URL:-https://argocd.backstage.nttdatacolombia.com}/api/v1'
+          changeOrigin: true
+          secure: false
+          headers:
+            Cookie: 'argocd.token=${ARGOCD_AUTH_TOKEN}'
+        '/grafana/api':
+          target: '${GRAFANA_BASE_URL:-https://grafana.backstage.nttdatacolombia.com}'
+          changeOrigin: true
+          headers:
+            Authorization: 'Bearer ${GRAFANA_TOKEN}'
+    
+    auth:
+      environment: production
+      providers:
+        github:
+          production:
+            clientId: ${GITHUB_APP_CLIENT_ID}
+            clientSecret: ${GITHUB_APP_CLIENT_SECRET}
+            scopes:
+              - repo
+              - read:user
+              - read:org
+              - codespace
+            signIn:
+              resolvers:
+                - resolver: usernameMatchingUserEntityName
+                  dangerouslyAllowSignInWithoutUserInCatalog: true
+    
+    techdocs:
+      builder: external
+      generator:
+        runIn: local
+      publisher:
+        type: azureBlobStorage
+        azureBlobStorage:
+          containerName: ${TECHDOCS_AZURE_BLOB_CONTAINER:-techdocs}
+          credentials:
+            accountName: ${TECHDOCS_AZURE_STORAGE_ACCOUNT}
+            accountKey: ${TECHDOCS_AZURE_STORAGE_ACCOUNT_KEY}
+    
+    catalog:
+      rules:
+        - allow: [Component, System, API, Resource, Location, Domain, Template, User, Group]
+      locations:
+        # Organization Data
+        - type: url
+          target: https://github.com/SuraOhorizons/ohorizons-mvp/blob/main/backstage/examples/org.yaml
+          rules:
+            - allow: [User, Group, Domain, System]
+        - type: url
+          target: https://github.com/SuraOhorizons/ohorizons-mvp/blob/main/backstage/examples/entities.yaml
+        - type: url
+          target: https://github.com/SuraOhorizons/ohorizons-mvp/blob/main/backstage/catalog-info.yaml
+        # AI Agent System
+        - type: url
+          target: https://github.com/SuraOhorizons/ohorizons-mvp/blob/main/backstage/catalog/ai-agents.yaml
+          rules:
+            - allow: [System, Component]
+        - type: url
+          target: https://github.com/SuraOhorizons/ohorizons-mvp/blob/main/backstage/catalog/ai-apis.yaml
+          rules:
+            - allow: [API]
+        - type: url
+          target: https://github.com/SuraOhorizons/ohorizons-mvp/blob/main/backstage/catalog/mcp-servers.yaml
+          rules:
+            - allow: [Resource]
+    
+    
+    permission:
+      enabled: false
+    
+    kubernetes:
+      serviceLocatorMethod:
+        type: multiTenant
+      clusterLocatorMethods: []
+    
+    argocd:
+      baseUrl: ${ARGOCD_BASE_URL:-https://argocd.backstage.nttdatacolombia.com}
+      appLocatorMethods:
+        - type: 'config'
+          instances:
+            - name: local
+              url: ${ARGOCD_BASE_URL:-https://argocd.backstage.nttdatacolombia.com}
+              token: ${ARGOCD_AUTH_TOKEN}
+    
+    grafana:
+      domain: ${GRAFANA_BASE_URL:-https://grafana.backstage.nttdatacolombia.com}
+      unifiedAlerting: true
+    
+    lighthouse:
+      baseUrl: https://backstage.nttdatacolombia.com/api/lighthouse
+    
+    copilot:
+      host: github.com
+      organization: SuraOhorizons
+    
+    costInsights:
+      engineerCost: 200000
+      products:
+        computeEngine:
+          name: Azure Compute
+        cloudStorage:
+          name: Azure Storage
+        bigQuery:
+          name: Azure SQL
+      metrics:
+        DAU:
+          name: Daily Active Users
+          default: true

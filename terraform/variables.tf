@@ -1,0 +1,278 @@
+# =============================================================================
+# OPEN HORIZONS PLATFORM - VARIABLES
+# =============================================================================
+#
+# All input variables for the platform. Use a .tfvars file to set values:
+#   terraform plan -var-file=environments/dev.tfvars
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# REQUIRED — Must be provided via .tfvars or -var flags
+# -----------------------------------------------------------------------------
+
+variable "customer_name" {
+  description = "Customer name for resource naming (lowercase, no spaces, 3-20 chars)"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{1,18}[a-z0-9]$", var.customer_name))
+    error_message = "Customer name must be 3-20 lowercase alphanumeric characters or hyphens."
+  }
+}
+
+variable "environment" {
+  description = "Environment (poc, dev, staging, prod)"
+  type        = string
+
+  validation {
+    condition     = contains(["poc", "dev", "staging", "prod"], var.environment)
+    error_message = "Environment must be poc, dev, staging, or prod."
+  }
+}
+
+variable "azure_subscription_id" {
+  description = "Azure subscription ID"
+  type        = string
+}
+
+variable "azure_tenant_id" {
+  description = "Azure AD / Entra ID tenant ID"
+  type        = string
+}
+
+variable "admin_group_id" {
+  description = "Azure AD / Entra ID group object ID for platform administrators. Required for platform/full validation; optional for Azure-only infrastructure planning."
+  type        = string
+  default     = ""
+}
+
+variable "github_org" {
+  description = "GitHub organization name. Required when GitHub-integrated modules such as ArgoCD, Backstage, or GitHub runners are enabled."
+  type        = string
+  default     = ""
+}
+
+variable "github_token" {
+  description = "GitHub personal access token (set via TF_VAR_github_token or -var). Required only when GitHub provider resources are enabled."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "domain_name" {
+  description = "Base domain name for the platform (e.g. platform.contoso.com). For Azure-only validation, an explicit temporary Azure DNS zone name can be used, but it will not resolve publicly unless delegated."
+  type        = string
+}
+
+# -----------------------------------------------------------------------------
+# DEPLOYMENT MODE — Controls sizing and feature defaults
+# -----------------------------------------------------------------------------
+
+variable "deployment_mode" {
+  description = "Deployment mode: express (minimal/dev), standard (production), enterprise (HA/multi-zone)"
+  type        = string
+  default     = "standard"
+
+  validation {
+    condition     = contains(["express", "standard", "enterprise"], var.deployment_mode)
+    error_message = "Deployment mode must be express, standard, or enterprise."
+  }
+}
+
+variable "disable_availability_zones" {
+  description = "Disable explicit availability zones for resources such as AKS node pools. Use when the selected subscription/region/SKU does not expose zone support."
+  type        = bool
+  default     = false
+}
+
+variable "aks_node_count_override" {
+  description = "Optional AKS system node count override for validation runs with constrained quota. Null uses the deployment mode default."
+  type        = number
+  default     = null
+}
+
+variable "aks_node_size_override" {
+  description = "Optional AKS system node VM size override for validation runs with constrained quota. Empty string uses the deployment mode default."
+  type        = string
+  default     = ""
+}
+
+variable "store_key_vault_secrets" {
+  description = "Store generated secrets in Key Vault. Disable for local staged validation when Key Vault public network access is disabled."
+  type        = bool
+  default     = true
+}
+
+variable "deploy_kubernetes_dashboards" {
+  description = "Deploy Kubernetes dashboard ConfigMaps from the observability module. Disable until AKS context is available in staged validation runs."
+  type        = bool
+  default     = true
+}
+
+variable "create_external_secret_store" {
+  description = "Create External Secrets ClusterSecretStore. Disable for first-stage External Secrets Helm/CRD installation."
+  type        = bool
+  default     = true
+}
+
+variable "enable_managed_grafana" {
+  description = "Deploy Azure Managed Grafana. Disable for staged validation until Microsoft.Dashboard provider registration is complete."
+  type        = bool
+  default     = true
+}
+
+variable "location" {
+  description = "Azure region for deployment"
+  type        = string
+  default     = "brazilsouth"
+}
+
+variable "tags" {
+  description = "Additional tags applied to all resources"
+  type        = map(string)
+  default     = {}
+}
+
+# -----------------------------------------------------------------------------
+# H1 FOUNDATION — Feature flags
+# -----------------------------------------------------------------------------
+
+
+
+variable "enable_container_registry" {
+  description = "Enable Azure Container Registry"
+  type        = bool
+  default     = true
+}
+
+variable "enable_databases" {
+  description = "Enable databases (PostgreSQL + Redis)"
+  type        = bool
+  default     = true
+}
+
+# -----------------------------------------------------------------------------
+# H2 ENHANCEMENT — Feature flags
+# -----------------------------------------------------------------------------
+
+variable "enable_argocd" {
+  description = "Deploy ArgoCD for GitOps"
+  type        = bool
+  default     = true
+}
+
+variable "enable_external_secrets" {
+  description = "Deploy External Secrets Operator"
+  type        = bool
+  default     = true
+}
+
+variable "enable_observability" {
+  description = "Deploy observability stack (Prometheus, Grafana, Azure Monitor)"
+  type        = bool
+  default     = true
+}
+
+variable "enable_ai_search" {
+  description = "Deploy Azure AI Search. Disable for validation when the chosen region has temporary AI Search capacity exhaustion."
+  type        = bool
+  default     = true
+}
+
+
+
+# -----------------------------------------------------------------------------
+# H3 INNOVATION — Feature flags
+# -----------------------------------------------------------------------------
+
+
+
+
+# -----------------------------------------------------------------------------
+# PLATFORM — Disaster Recovery
+# -----------------------------------------------------------------------------
+
+
+
+# -----------------------------------------------------------------------------
+# Backstage Components — runtime toggles for plugins and agent APIs
+# -----------------------------------------------------------------------------
+
+variable "enable_ai_chat_plugin" {
+  description = "Enable the Backstage AI Chat plugin in the portal UI."
+  type        = bool
+  default     = true
+}
+
+variable "enable_agent_api" {
+  description = "Enable the AI Chat backend (agent-api). Required by enable_ai_chat_plugin."
+  type        = bool
+  default     = true
+}
+
+
+
+
+
+# -----------------------------------------------------------------------------
+# ArgoCD — Required when enable_argocd = true
+# -----------------------------------------------------------------------------
+
+variable "argocd_admin_password" {
+  description = "ArgoCD admin password (bcrypt hash). Generate: htpasswd -nbBC 10 '' 'password' | tr -d ':'"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_app_id" {
+  description = "GitHub App ID for ArgoCD/Backstage authentication"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_app_client_id" {
+  description = "GitHub App Client ID"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_app_client_secret" {
+  description = "GitHub App Client Secret"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_app_installation_id" {
+  description = "GitHub App Installation ID for self-hosted runners"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_app_private_key" {
+  description = "GitHub App Private Key (PEM format) for self-hosted runners"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# -----------------------------------------------------------------------------
+# Cost Management — Required when enable_cost_management = true
+# -----------------------------------------------------------------------------
+
+variable "budget_amount" {
+  description = "Monthly budget in USD"
+  type        = number
+  default     = 5000
+}
+
+variable "alert_emails" {
+  description = "Email addresses for cost and platform alerts"
+  type        = list(string)
+  default     = []
+}
