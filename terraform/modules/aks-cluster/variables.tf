@@ -175,3 +175,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "use_existing_aks" {
+  description = "Use an existing AKS cluster instead of creating one."
+  type        = bool
+  default     = false
+}
+
+variable "existing_aks_name" {
+  description = "Name of the existing AKS cluster."
+  type        = string
+  default     = ""
+}

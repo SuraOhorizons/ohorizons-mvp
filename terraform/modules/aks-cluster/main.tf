@@ -32,6 +32,13 @@ locals {
     Component = "AKS"
     Module    = "open-horizons-accelerator"
   })
+
+  # Effective AKS references.
+  # When use_existing_aks=true, consume the SURA-reference-style existing
+  # infrastructure instead of creating a new cluster.
+  effective_cluster_id   = var.use_existing_aks ? data.azurerm_kubernetes_cluster.existing[0].id : azurerm_kubernetes_cluster.main[0].id
+  effective_cluster_name = var.use_existing_aks ? data.azurerm_kubernetes_cluster.existing[0].name : azurerm_kubernetes_cluster.main[0].name
+  effective_cluster_fqdn = var.use_existing_aks ? data.azurerm_kubernetes_cluster.existing[0].fqdn : azurerm_kubernetes_cluster.main[0].fqdn
 }
 
 # =============================================================================
@@ -40,11 +47,19 @@ locals {
 
 data "azurerm_client_config" "current" {}
 
+data "azurerm_kubernetes_cluster" "existing" {
+  count               = var.use_existing_aks ? 1 : 0
+  name                = var.existing_aks_name
+  resource_group_name = var.resource_group_name
+}
+
 # =============================================================================
 # AKS CLUSTER
 # =============================================================================
 
 resource "azurerm_kubernetes_cluster" "main" {
+  count = var.use_existing_aks ? 0 : 1
+
   name                = local.cluster_name
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -137,7 +152,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   # CONTAINER INSIGHTS (OMS AGENT)
   # ==========================================================================
   dynamic "oms_agent" {
-    for_each = var.log_analytics_id != null ? [1] : []
+    for_each = var.log_analytics_id != null && !var.use_existing_aks ? [1] : []
     content {
       log_analytics_workspace_id = var.log_analytics_id
     }
@@ -209,10 +224,10 @@ resource "azurerm_kubernetes_cluster" "main" {
 # =============================================================================
 
 resource "azurerm_kubernetes_cluster_node_pool" "user" {
-  for_each = var.additional_node_pools
+  for_each = var.use_existing_aks ? {} : var.additional_node_pools
 
   name                  = each.value.name
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.main.id
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.main[0].id
   vm_size               = each.value.vm_size
   zones                 = each.value.zones
   vnet_subnet_id        = var.network_config.nodes_subnet_id
@@ -248,9 +263,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "user" {
 # =============================================================================
 
 resource "azurerm_role_assignment" "acr_pull" {
-  count = var.acr_id != null ? 1 : 0
+  count = var.acr_id != null && !var.use_existing_aks ? 1 : 0
 
-  principal_id                     = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
+  principal_id                     = azurerm_kubernetes_cluster.main[0].kubelet_identity[0].object_id
   role_definition_name             = "AcrPull"
   scope                            = var.acr_id
   skip_service_principal_aad_check = true
@@ -261,9 +276,9 @@ resource "azurerm_role_assignment" "acr_pull" {
 # =============================================================================
 
 resource "azurerm_role_assignment" "keyvault_secrets" {
-  count = var.key_vault_id != null ? 1 : 0
+  count = var.key_vault_id != null && !var.use_existing_aks ? 1 : 0
 
-  principal_id                     = azurerm_kubernetes_cluster.main.key_vault_secrets_provider[0].secret_identity[0].object_id
+  principal_id                     = azurerm_kubernetes_cluster.main[0].key_vault_secrets_provider[0].secret_identity[0].object_id
   role_definition_name             = "Key Vault Secrets User"
   scope                            = var.key_vault_id
   skip_service_principal_aad_check = true
@@ -274,10 +289,10 @@ resource "azurerm_role_assignment" "keyvault_secrets" {
 # =============================================================================
 
 resource "azurerm_monitor_diagnostic_setting" "aks" {
-  count = var.log_analytics_id != null ? 1 : 0
+  count = var.log_analytics_id != null && !var.use_existing_aks ? 1 : 0
 
   name                       = "aks-diagnostics"
-  target_resource_id         = azurerm_kubernetes_cluster.main.id
+  target_resource_id         = azurerm_kubernetes_cluster.main[0].id
   log_analytics_workspace_id = var.log_analytics_id
 
   # Control plane logs

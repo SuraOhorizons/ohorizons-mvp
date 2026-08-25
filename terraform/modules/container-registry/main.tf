@@ -35,8 +35,16 @@ locals {
 # =============================================================================
 # AZURE CONTAINER REGISTRY
 # =============================================================================
+data "azurerm_container_registry" "existing" {
+  count               = var.use_existing_container_registry ? 1 : 0
+  name                = var.existing_container_registry_name
+  resource_group_name = var.resource_group_name
+}
+
 
 resource "azurerm_container_registry" "main" {
+  count = var.use_existing_container_registry ? 0 : 1
+
   name                = local.acr_name
   resource_group_name = var.resource_group_name
   location            = var.location
@@ -106,6 +114,7 @@ resource "azurerm_container_registry" "main" {
 # =============================================================================
 
 resource "azurerm_private_endpoint" "acr" {
+  count               = var.use_existing_container_registry ? 0 : 1
   name                = "pe-${local.acr_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -113,7 +122,7 @@ resource "azurerm_private_endpoint" "acr" {
 
   private_service_connection {
     name                           = "acr-connection"
-    private_connection_resource_id = azurerm_container_registry.main.id
+    private_connection_resource_id = azurerm_container_registry.main[0].id
     is_manual_connection           = false
     subresource_names              = ["registry"]
   }
@@ -132,16 +141,17 @@ resource "azurerm_private_endpoint" "acr" {
 
 # AKS Kubelet identity - AcrPull
 resource "azurerm_role_assignment" "aks_acr_pull" {
-  scope                = azurerm_container_registry.main.id
+  count                = var.use_existing_container_registry ? 0 : 1
+  scope                = azurerm_container_registry.main[0].id
   role_definition_name = "AcrPull"
   principal_id         = var.aks_kubelet_identity_object_id
 }
 
 # GitHub Actions identities - AcrPush
 resource "azurerm_role_assignment" "github_actions_push" {
-  for_each = toset(var.github_actions_identity_ids)
+  for_each = var.use_existing_container_registry ? toset([]) : toset(var.github_actions_identity_ids)
 
-  scope                = azurerm_container_registry.main.id
+  scope                = azurerm_container_registry.main[0].id
   role_definition_name = "AcrPush"
   principal_id         = each.value
 }
@@ -151,8 +161,9 @@ resource "azurerm_role_assignment" "github_actions_push" {
 # =============================================================================
 
 resource "azurerm_container_registry_scope_map" "ci_push" {
+  count                   = var.use_existing_container_registry ? 0 : 1
   name                    = "ci-push-scope"
-  container_registry_name = azurerm_container_registry.main.name
+  container_registry_name = azurerm_container_registry.main[0].name
   resource_group_name     = var.resource_group_name
 
   actions = [
@@ -164,8 +175,9 @@ resource "azurerm_container_registry_scope_map" "ci_push" {
 }
 
 resource "azurerm_container_registry_scope_map" "readonly" {
+  count                   = var.use_existing_container_registry ? 0 : 1
   name                    = "readonly-scope"
-  container_registry_name = azurerm_container_registry.main.name
+  container_registry_name = azurerm_container_registry.main[0].name
   resource_group_name     = var.resource_group_name
 
   actions = [
@@ -179,11 +191,11 @@ resource "azurerm_container_registry_scope_map" "readonly" {
 # =============================================================================
 
 resource "azurerm_container_registry_webhook" "image_push" {
-  count = var.enable_webhook && var.webhook_service_uri != "" ? 1 : 0
+  count = var.enable_webhook && var.webhook_service_uri != "" && !var.use_existing_container_registry ? 1 : 0
 
   name                = "imagepush"
   resource_group_name = var.resource_group_name
-  registry_name       = azurerm_container_registry.main.name
+  registry_name       = azurerm_container_registry.main[0].name
   location            = var.location
 
   service_uri = var.webhook_service_uri
@@ -203,10 +215,10 @@ resource "azurerm_container_registry_webhook" "image_push" {
 # =============================================================================
 
 resource "azurerm_container_registry_task" "purge_old_images" {
-  count = var.sku == "Premium" ? 1 : 0
+  count = var.sku == "Premium" && !var.use_existing_container_registry ? 1 : 0
 
   name                  = "purge-old-images"
-  container_registry_id = azurerm_container_registry.main.id
+  container_registry_id = azurerm_container_registry.main[0].id
 
   platform {
     os = "Linux"
@@ -238,10 +250,10 @@ resource "azurerm_container_registry_task" "purge_old_images" {
 
 
 resource "azurerm_monitor_diagnostic_setting" "acr" {
-  count = var.log_analytics_workspace_id != "" ? 1 : 0
+  count = var.log_analytics_workspace_id != "" && !var.use_existing_container_registry ? 1 : 0
 
   name                       = "acr-diagnostics"
-  target_resource_id         = azurerm_container_registry.main.id
+  target_resource_id         = azurerm_container_registry.main[0].id
   log_analytics_workspace_id = var.log_analytics_workspace_id
 
   enabled_log {

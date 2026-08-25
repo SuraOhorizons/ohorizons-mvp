@@ -111,3 +111,16 @@ variable "webhook_service_uri" {
   type        = string
   default     = ""
 }
+
+
+variable "use_existing_container_registry" {
+  description = "Use an existing Azure Container Registry instead of creating one."
+  type        = bool
+  default     = false
+}
+
+variable "existing_container_registry_name" {
+  description = "Name of the existing Azure Container Registry."
+  type        = string
+  default     = ""
+}
