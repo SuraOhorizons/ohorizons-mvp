@@ -52,7 +52,7 @@ data "azurerm_postgresql_flexible_server" "existing" {
 # =============================================================================
 
 resource "random_password" "postgresql" {
-  count = var.postgresql_config.enabled ? 1 : 0
+  count = var.postgresql_config.enabled && !var.use_existing_postgresql ? 1 : 0
 
   length           = 32
   special          = true
@@ -67,7 +67,7 @@ resource "random_password" "postgresql" {
 # =============================================================================
 
 resource "azurerm_postgresql_flexible_server" "main" {
-  count = var.postgresql_config.enabled ? 1 : 0
+  count = var.postgresql_config.enabled && !var.use_existing_postgresql ? 1 : 0
 
   name                = "psql-${local.name_prefix}"
   location            = var.location
@@ -123,7 +123,7 @@ resource "azurerm_postgresql_flexible_server" "main" {
 
 # PostgreSQL Databases
 resource "azurerm_postgresql_flexible_server_database" "databases" {
-  for_each = var.postgresql_config.enabled ? toset(var.postgresql_config.databases) : []
+  for_each = var.postgresql_config.enabled && !var.use_existing_postgresql ? toset(var.postgresql_config.databases) : []
 
   name      = each.key
   server_id = azurerm_postgresql_flexible_server.main[0].id
@@ -133,7 +133,7 @@ resource "azurerm_postgresql_flexible_server_database" "databases" {
 
 # PostgreSQL Configuration
 resource "azurerm_postgresql_flexible_server_configuration" "configs" {
-  for_each = var.postgresql_config.enabled ? {
+  for_each = var.postgresql_config.enabled && !var.use_existing_postgresql ? {
     "log_checkpoints"            = "on"
     "log_connections"            = "on"
     "log_disconnections"         = "on"
@@ -153,12 +153,22 @@ resource "azurerm_postgresql_flexible_server_configuration" "configs" {
 
 # PostgreSQL Firewall Rule (allow Azure services)
 resource "azurerm_postgresql_flexible_server_firewall_rule" "azure_services" {
-  count = var.postgresql_config.enabled ? 1 : 0
+  count = var.postgresql_config.enabled && !var.use_existing_postgresql ? 1 : 0
 
   name             = "AllowAzureServices"
   server_id        = azurerm_postgresql_flexible_server.main[0].id
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
+}
+
+# =============================================================================
+# EXISTING REDIS
+# =============================================================================
+
+data "azapi_resource" "existing_redis" {
+  count       = var.use_existing_redis ? 1 : 0
+  type        = "Microsoft.Cache/redisEnterprise@2025-07-01"
+  resource_id = "${data.azurerm_resource_group.main.id}/providers/Microsoft.Cache/redisEnterprise/${var.existing_redis_name}"
 }
 
 # =============================================================================
@@ -176,7 +186,7 @@ data "azurerm_resource_group" "main" {
 }
 
 resource "azapi_resource" "redis_enterprise" {
-  count = var.redis_config.enabled ? 1 : 0
+  count = var.redis_config.enabled && !var.use_existing_redis ? 1 : 0
 
   type      = "Microsoft.Cache/redisEnterprise@2025-07-01"
   name      = "redis-${local.name_prefix}"
@@ -200,7 +210,7 @@ resource "azapi_resource" "redis_enterprise" {
 }
 
 resource "azapi_resource" "redis_database" {
-  count = var.redis_config.enabled ? 1 : 0
+  count = var.redis_config.enabled && !var.use_existing_redis ? 1 : 0
 
   type      = "Microsoft.Cache/redisEnterprise/databases@2025-07-01"
   name      = "default"
@@ -219,7 +229,7 @@ resource "azapi_resource" "redis_database" {
 
 # Retrieve the database access keys (listKeys action).
 resource "azapi_resource_action" "redis_keys" {
-  count = var.store_key_vault_secrets && var.redis_config.enabled ? 1 : 0
+  count = var.store_key_vault_secrets && var.redis_config.enabled && !var.use_existing_redis ? 1 : 0
 
   type        = "Microsoft.Cache/redisEnterprise/databases@2025-07-01"
   resource_id = azapi_resource.redis_database[0].id
@@ -231,7 +241,7 @@ resource "azapi_resource_action" "redis_keys" {
 
 # Redis Private Endpoint
 resource "azurerm_private_endpoint" "redis" {
-  count = var.redis_config.enabled ? 1 : 0
+  count = var.redis_config.enabled && !var.use_existing_redis ? 1 : 0
 
   name                = "pe-redis-${local.name_prefix}"
   location            = var.location
@@ -283,7 +293,7 @@ resource "azurerm_key_vault_secret" "postgresql_password" {
 
 # Store Redis connection string
 resource "azurerm_key_vault_secret" "redis_connection_string" {
-  count = var.store_key_vault_secrets && var.redis_config.enabled ? 1 : 0
+  count = var.store_key_vault_secrets && var.redis_config.enabled && !var.use_existing_redis ? 1 : 0
 
   name         = "redis-connection-string"
   value        = "${azapi_resource.redis_enterprise[0].output.properties.hostName}:${local.redis_port},password=${azapi_resource_action.redis_keys[0].output.primaryKey},ssl=True,abortConnect=False"
@@ -294,7 +304,7 @@ resource "azurerm_key_vault_secret" "redis_connection_string" {
 
 # Store Redis primary key
 resource "azurerm_key_vault_secret" "redis_primary_key" {
-  count = var.store_key_vault_secrets && var.redis_config.enabled ? 1 : 0
+  count = var.store_key_vault_secrets && var.redis_config.enabled && !var.use_existing_redis ? 1 : 0
 
   name         = "redis-primary-key"
   value        = azapi_resource_action.redis_keys[0].output.primaryKey

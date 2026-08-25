@@ -146,3 +146,15 @@ variable "existing_postgresql_name" {
   type        = string
   default     = ""
 }
+
+variable "use_existing_redis" {
+  description = "Use an existing Azure Managed Redis resource."
+  type        = bool
+  default     = false
+}
+
+variable "existing_redis_name" {
+  description = "Existing Azure Managed Redis resource name."
+  type        = string
+  default     = ""
+}

@@ -1,11 +1,11 @@
 output "postgresql_server_id" {
   description = "PostgreSQL server ID"
-  value       = var.postgresql_config.enabled ? azurerm_postgresql_flexible_server.main[0].id : null
+  value       = var.postgresql_config.enabled ? (var.use_existing_postgresql ? data.azurerm_postgresql_flexible_server.existing[0].id : azurerm_postgresql_flexible_server.main[0].id) : null
 }
 
 output "postgresql_server_fqdn" {
   description = "PostgreSQL server FQDN"
-  value       = var.postgresql_config.enabled ? azurerm_postgresql_flexible_server.main[0].fqdn : null
+  value       = var.postgresql_config.enabled ? (var.use_existing_postgresql ? data.azurerm_postgresql_flexible_server.existing[0].fqdn : azurerm_postgresql_flexible_server.main[0].fqdn) : null
 }
 
 output "postgresql_admin_username" {
@@ -20,12 +20,12 @@ output "postgresql_databases" {
 
 output "redis_id" {
   description = "Azure Managed Redis cluster ID"
-  value       = var.redis_config.enabled ? azapi_resource.redis_enterprise[0].id : null
+  value       = var.redis_config.enabled ? (var.use_existing_redis ? data.azapi_resource.existing_redis[0].id : azapi_resource.redis_enterprise[0].id) : null
 }
 
 output "redis_hostname" {
   description = "Azure Managed Redis cluster hostname"
-  value       = var.redis_config.enabled ? azapi_resource.redis_enterprise[0].output.properties.hostName : null
+  value       = var.redis_config.enabled ? (var.use_existing_redis ? data.azapi_resource.existing_redis[0].output.properties.hostName : azapi_resource.redis_enterprise[0].output.properties.hostName) : null
 }
 
 output "redis_ssl_port" {
@@ -50,16 +50,21 @@ output "key_vault_secret_names" {
 
 output "server_name" {
   description = "Database server name"
-  value       = var.postgresql_config.enabled ? azurerm_postgresql_flexible_server.main[0].name : null
+  value       = var.postgresql_config.enabled ? (var.use_existing_postgresql ? data.azurerm_postgresql_flexible_server.existing[0].name : azurerm_postgresql_flexible_server.main[0].name) : null
 }
 
 output "server_fqdn" {
   description = "Database server FQDN"
-  value       = var.postgresql_config.enabled ? azurerm_postgresql_flexible_server.main[0].fqdn : null
+  value       = var.postgresql_config.enabled ? (var.use_existing_postgresql ? data.azurerm_postgresql_flexible_server.existing[0].fqdn : azurerm_postgresql_flexible_server.main[0].fqdn) : null
 }
 
 output "connection_string" {
   description = "Database connection string"
-  value       = var.postgresql_config.enabled ? "postgresql://${var.postgresql_config.admin_username}@${azurerm_postgresql_flexible_server.main[0].name}:@${azurerm_postgresql_flexible_server.main[0].fqdn}:5432/${var.postgresql_config.databases[0]}?sslmode=require" : null
-  sensitive   = true
+  value = var.postgresql_config.enabled ? format(
+    "postgresql://%s@%s:5432/%s?sslmode=require",
+    var.postgresql_config.admin_username,
+    var.use_existing_postgresql ? data.azurerm_postgresql_flexible_server.existing[0].fqdn : azurerm_postgresql_flexible_server.main[0].fqdn,
+    var.postgresql_config.databases[0]
+  ) : null
+  sensitive = true
 }
