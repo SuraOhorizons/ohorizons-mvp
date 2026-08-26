@@ -575,6 +575,7 @@ module "servicebus" {
   location                           = var.location
   resource_group_name                = local.platform_resource_group_name
   existing_servicebus_namespace_name = var.existing_servicebus_namespace_name
+  existing_servicebus_queue_name     = var.existing_servicebus_queue_name
 
   tags = local.common_tags
 }

@@ -358,3 +358,9 @@ variable "existing_subnet_names" {
   type        = map(string)
   default     = {}
 }
+
+variable "existing_servicebus_queue_name" {
+  description = "Existing Azure Service Bus queue."
+  type        = string
+  default     = ""
+}

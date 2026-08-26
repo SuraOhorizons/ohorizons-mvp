@@ -20,3 +20,9 @@ resource "azurerm_servicebus_namespace" "main" {
 
   tags = var.tags
 }
+
+data "azurerm_servicebus_queue" "existing" {
+  count        = var.existing_servicebus_queue_name != "" ? 1 : 0
+  name         = var.existing_servicebus_queue_name
+  namespace_id = data.azurerm_servicebus_namespace.existing[0].id
+}

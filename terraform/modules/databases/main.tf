@@ -271,7 +271,7 @@ data "azurerm_client_config" "current" {}
 
 # Store PostgreSQL connection string
 resource "azurerm_key_vault_secret" "postgresql_connection_string" {
-  count = var.store_key_vault_secrets && var.postgresql_config.enabled ? 1 : 0
+  count = var.store_key_vault_secrets && var.postgresql_config.enabled && !var.use_existing_postgresql ? 1 : 0
 
   name         = "postgresql-connection-string"
   value        = "postgresql://${var.postgresql_config.admin_username}:${random_password.postgresql[0].result}@${azurerm_postgresql_flexible_server.main[0].fqdn}:5432/postgres?sslmode=require"
@@ -282,7 +282,7 @@ resource "azurerm_key_vault_secret" "postgresql_connection_string" {
 
 # Store PostgreSQL admin password
 resource "azurerm_key_vault_secret" "postgresql_password" {
-  count = var.store_key_vault_secrets && var.postgresql_config.enabled ? 1 : 0
+  count = var.store_key_vault_secrets && var.postgresql_config.enabled && !var.use_existing_postgresql ? 1 : 0
 
   name         = "postgresql-admin-password"
   value        = random_password.postgresql[0].result

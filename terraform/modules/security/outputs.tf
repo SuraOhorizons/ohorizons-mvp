@@ -54,5 +54,7 @@ output "aad_tenant_id" {
 
 output "private_endpoint_ip" {
   description = "Key Vault private endpoint IP"
-  value       = azurerm_private_endpoint.key_vault.private_service_connection[0].private_ip_address
+  value = var.use_existing_key_vault ? null : (
+    azurerm_private_endpoint.key_vault[0].private_service_connection[0].private_ip_address
+  )
 }

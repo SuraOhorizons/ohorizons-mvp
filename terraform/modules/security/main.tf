@@ -78,6 +78,8 @@ resource "azurerm_key_vault" "main" {
 
 # Key Vault Private Endpoint
 resource "azurerm_private_endpoint" "key_vault" {
+  count = var.use_existing_key_vault ? 0 : 1
+
   name                = "pe-kv-${local.name_prefix}"
   location            = var.location
   resource_group_name = var.resource_group_name
