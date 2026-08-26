@@ -11,10 +11,10 @@ output "vnet_name" {
 output "subnet_ids" {
   description = "Subnet IDs"
   value = var.use_existing_network ? {
-    aks_nodes         = var.existing_subnet_ids["aks_nodes"]
-    aks_pods          = var.existing_subnet_ids["aks_pods"]
-    postgres          = var.existing_subnet_ids["postgres"]
-    private_endpoints = var.existing_subnet_ids["private_endpoints"]
+    aks_nodes         = data.azurerm_subnet.existing["aks_nodes"].id
+    aks_pods          = data.azurerm_subnet.existing["aks_pods"].id
+    postgres          = data.azurerm_subnet.existing["postgres"].id
+    private_endpoints = data.azurerm_subnet.existing["private_endpoints"].id
     } : {
     aks_nodes         = azurerm_subnet.aks_nodes[0].id
     aks_pods          = azurerm_subnet.aks_pods[0].id
@@ -25,7 +25,7 @@ output "subnet_ids" {
 
 output "aks_subnet_id" {
   description = "AKS nodes subnet ID"
-  value       = var.use_existing_network ? var.existing_subnet_ids["aks_nodes"] : azurerm_subnet.aks_nodes[0].id
+  value       = var.use_existing_network ? data.azurerm_subnet.existing["aks_nodes"].id : azurerm_subnet.aks_nodes[0].id
 }
 
 output "private_dns_zone_ids" {

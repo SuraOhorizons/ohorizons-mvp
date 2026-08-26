@@ -238,7 +238,7 @@ module "networking" {
 
   use_existing_network          = var.use_existing_infrastructure
   existing_vnet_name            = var.existing_vnet_name
-  existing_subnet_ids           = var.existing_subnet_ids
+  existing_subnet_names         = var.existing_subnet_names
   existing_private_dns_zone_ids = var.existing_private_dns_zone_ids
 
   dns_zone_name   = var.domain_name
@@ -263,6 +263,9 @@ module "security" {
 
   aks_oidc_issuer_url         = module.aks.oidc_issuer_url
   enable_aad_app_registration = var.github_org != "" && (var.enable_argocd || var.enable_ai_chat_plugin || var.enable_agent_api)
+
+  use_existing_key_vault  = var.existing_key_vault_name != ""
+  existing_key_vault_name = var.existing_key_vault_name
 
   key_vault_config = {
     sku_name                      = "standard"
@@ -415,6 +418,9 @@ module "databases" {
     redis    = module.networking.private_dns_zone_ids.redis
   }
 
+  use_existing_postgresql  = var.existing_postgresql_name != ""
+  existing_postgresql_name = var.existing_postgresql_name
+
   postgresql_config = {
     enabled               = true
     sku_name              = var.deployment_mode == "express" ? "B_Standard_B1ms" : "GP_Standard_D2s_v3"
@@ -426,6 +432,9 @@ module "databases" {
     high_availability     = local.config.enable_ha && !var.disable_availability_zones
     databases             = ["backstage"]
   }
+
+  use_existing_redis  = var.existing_redis_name != ""
+  existing_redis_name = var.existing_redis_name
 
   redis_config = {
     enabled             = true
@@ -525,14 +534,49 @@ module "container_registry" {
   location            = var.location
   resource_group_name = local.platform_resource_group_name
 
-  sku                            = var.deployment_mode == "express" ? "Standard" : "Premium"
-  subnet_id                      = module.networking.subnet_ids.private_endpoints
-  private_dns_zone_id            = module.networking.private_dns_zone_ids.acr
-  aks_kubelet_identity_object_id = module.aks.kubelet_identity
+  sku                              = var.deployment_mode == "express" ? "Standard" : "Premium"
+  use_existing_container_registry  = var.existing_container_registry_name != ""
+  existing_container_registry_name = var.existing_container_registry_name
+  subnet_id                        = module.networking.subnet_ids.private_endpoints
+  private_dns_zone_id              = module.networking.private_dns_zone_ids.acr
+  aks_kubelet_identity_object_id   = module.aks.kubelet_identity
 
   tags = local.common_tags
 
   depends_on = [module.networking, module.aks]
+}
+
+# =============================================================================
+# MODULE: STORAGE
+# =============================================================================
+
+module "storage" {
+  source = "./modules/storage"
+  count  = length(var.existing_storage_account_names) > 0 || var.enable_container_registry ? 1 : 0
+
+  customer_name       = var.customer_name
+  environment         = var.environment
+  location            = var.location
+  resource_group_name = local.platform_resource_group_name
+
+  existing_storage_account_names = var.existing_storage_account_names
+
+  tags = local.common_tags
+}
+
+# =============================================================================
+# MODULE: SERVICE BUS
+# =============================================================================
+
+module "servicebus" {
+  source = "./modules/servicebus"
+  count  = var.existing_servicebus_namespace_name != "" ? 1 : 0
+
+  location                           = var.location
+  resource_group_name                = local.platform_resource_group_name
+  existing_servicebus_namespace_name = var.existing_servicebus_namespace_name
+
+  tags = local.common_tags
 }
 
 # =============================================================================

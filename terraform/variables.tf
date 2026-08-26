@@ -346,3 +346,15 @@ variable "existing_storage_account_names" {
   type        = list(string)
   default     = []
 }
+
+variable "existing_container_registry_name" {
+  description = "Existing Azure Container Registry."
+  type        = string
+  default     = ""
+}
+
+variable "existing_subnet_names" {
+  description = "Existing subnet names keyed by platform purpose."
+  type        = map(string)
+  default     = {}
+}

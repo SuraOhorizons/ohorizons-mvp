@@ -89,8 +89,8 @@ variable "existing_vnet_name" {
   default     = ""
 }
 
-variable "existing_subnet_ids" {
-  description = "Existing subnet IDs keyed by platform purpose."
+variable "existing_subnet_names" {
+  description = "Existing subnet names keyed by platform purpose."
   type        = map(string)
   default     = {}
 }

@@ -57,6 +57,18 @@ data "azurerm_virtual_network" "existing" {
 }
 
 # =============================================================================
+# EXISTING SUBNET DATA
+# =============================================================================
+
+data "azurerm_subnet" "existing" {
+  for_each = var.use_existing_network ? var.existing_subnet_names : {}
+
+  name                 = each.value
+  virtual_network_name = var.existing_vnet_name
+  resource_group_name  = var.resource_group_name
+}
+
+# =============================================================================
 # VIRTUAL NETWORK
 # =============================================================================
 
