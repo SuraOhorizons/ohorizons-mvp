@@ -165,19 +165,6 @@ spec:
           azureOpenAIApiKeySecretKey: ${{ parameters.azureOpenAIApiKeySecretKey }}
           githubTokenSecretKey: ${{ parameters.githubTokenSecretKey }}
 
-    - id: fetch-docs
-      name: Copiar TechDocs
-      action: fetch:template
-      input:
-        url: ./skeleton
-        values:
-          name: ${{ parameters.name }}
-          description: ${{ parameters.description }}
-        copyWithoutRender:
-          - app
-          - .github
-          - deploy
-
     - id: publish
       name: Publicar en GitHub
       action: publish:github
