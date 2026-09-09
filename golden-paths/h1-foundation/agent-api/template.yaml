@@ -111,6 +111,15 @@ spec:
           type: string
           description: Nombre del secreto en Key Vault con el token para que los agentes llamen a la API de GitHub
           default: GithubToken
+        githubOwner:
+          title: Organización de GitHub a consultar
+          type: string
+          description: >-
+            Organización/owner que los agentes (@pipeline, @sentinel, @compass)
+            consultan al llamar a la API de GitHub. El default del código
+            (sin esta variable) apunta al proyecto open-source original
+            ("Ohorizons"), no a tu organización real.
+          default: SuraOhorizons
 
   # ===========================================================================
   # STEPS
@@ -150,6 +159,7 @@ spec:
           system: ${{ parameters.system }}
           registry: ${{ parameters.registry }}
           allowedOrigin: ${{ parameters.allowedOrigin }}
+          githubOwner: ${{ parameters.githubOwner }}
           azureOpenAIDeployment: ${{ parameters.azureOpenAIDeployment }}
           azureOpenAIEndpointSecretKey: ${{ parameters.azureOpenAIEndpointSecretKey }}
           azureOpenAIApiKeySecretKey: ${{ parameters.azureOpenAIApiKeySecretKey }}

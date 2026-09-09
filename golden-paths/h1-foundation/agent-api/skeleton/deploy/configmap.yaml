@@ -9,3 +9,4 @@ data:
   MODEL_DISPLAY_NAME: "${{values.azureOpenAIDeployment}}"
   CORS_ORIGINS: "${{values.allowedOrigin}}"
   LOG_LEVEL: "INFO"
+  GITHUB_OWNER: "${{values.githubOwner}}"
