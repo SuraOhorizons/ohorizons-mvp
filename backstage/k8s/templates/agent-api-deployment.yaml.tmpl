@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: __PLATFORM_NAME__-agent-api
+  namespace: ai-services
+  labels:
+    app.kubernetes.io/name: agent-api
+    app.kubernetes.io/instance: __PLATFORM_NAME__
+    app.kubernetes.io/version: __IMAGE_TAG__
+    app.kubernetes.io/component: ai-agent
+    app.kubernetes.io/part-of: __PLATFORM_NAME__
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-api
+        app.kubernetes.io/instance: __PLATFORM_NAME__
+        app.kubernetes.io/version: __IMAGE_TAG__
+        app.kubernetes.io/component: ai-agent
+        app.kubernetes.io/part-of: __PLATFORM_NAME__
+        app.kubernetes.io/managed-by: kustomize
+    spec:
+      serviceAccountName: agent-api-chat
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent-api
+          image: __AGENT_API_IMAGE__:__IMAGE_TAG__
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 8008
+              name: http
+          env:
+            - name: AZURE_OPENAI_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: agent-api-secrets
+                  key: AZURE_OPENAI_ENDPOINT
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-api-secrets
+                  key: AZURE_OPENAI_API_KEY
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-secrets
+                  key: GITHUB_TOKEN
+                  optional: true
+            - name: GITHUB_OWNER
+              value: "__GITHUB_ORG__"
+            - name: AZURE_OPENAI_DEPLOYMENT
+              value: "__AZURE_OPENAI_DEPLOYMENT__"
+            - name: MAX_TOKENS
+              value: "4096"
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "8008"
+            - name: CORS_ORIGINS
+              value: "https://__DOMAIN__,http://__PLATFORM_NAME__-backstage.backstage.svc.cluster.local:7007"
+            # MCP Ecosystem (L3 context) — same-namespace Service in ai-services.
+            # The client also defaults to this URL; set explicitly for clarity and
+            # so it can be overridden per environment. If unreachable, AI Chat
+            # degrades gracefully and answers without upstream grounding.
+            - name: MCP_ECOSYSTEM_URL
+              value: "http://mcp-ecosystem.ai-services.svc.cluster.local:3100/mcp"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8008
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8008
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
