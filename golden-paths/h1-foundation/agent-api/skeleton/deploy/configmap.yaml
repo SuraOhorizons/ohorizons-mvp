@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${{values.name}}-config
+  namespace: ${{values.namespace}}
+data:
+  AZURE_OPENAI_API_VERSION: "2025-04-01-preview"
+  AZURE_OPENAI_DEPLOYMENT: "${{values.azureOpenAIDeployment}}"
+  MODEL_DISPLAY_NAME: "${{values.azureOpenAIDeployment}}"
+  CORS_ORIGINS: "${{values.allowedOrigin}}"
+  LOG_LEVEL: "INFO"

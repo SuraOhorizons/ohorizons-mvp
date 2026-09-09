@@ -6,6 +6,7 @@ Foundation-level templates for basic infrastructure and application scaffolding.
 
 | Template | Description | Complexity |
 |----------|-------------|------------|
+| `agent-api` | FastAPI multi-agent backend for Backstage's AI Chat, with CI/CD + ArgoCD | Medium |
 | `basic-cicd` | Simple CI/CD pipeline for any project | Simple |
 | `documentation-site` | Documentation website using MkDocs/Docusaurus | Simple |
 | `infrastructure-provisioning` | Terraform module scaffolding | Medium |
@@ -15,6 +16,16 @@ Foundation-level templates for basic infrastructure and application scaffolding.
 | `web-application` | Full-stack web application | Medium |
 
 ## Template Details
+
+### agent-api
+
+Creates the multi-agent backend that powers Backstage's built-in AI Chat
+("Intelligence" sidebar):
+- FastAPI + Azure OpenAI SDK, 7 agents (orchestrator, pipeline, sentinel, compass, guardian, lighthouse, forge)
+- Streaming SSE, trajectory logging, cost tracking, GitHub API tools
+- CI/CD: build + push to ACR
+- Kubernetes manifests (`deploy/`) with `ExternalSecret` for Azure OpenAI + GitHub credentials
+- ArgoCD `Application` for GitOps deployment
 
 ### basic-cicd
 

@@ -1,0 +1,57 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: Backend multi-agente (FastAPI + Azure OpenAI) para el AI Chat integrado de Backstage
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}
+  providesApis:
+    - ${{ values.name }}-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: ${{ values.name }}-api
+  description: API del backend multi-agente de ${{ values.name }}
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: ${{ values.owner }}
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: ${{values.name}} API
+      version: 2.0.0
+    paths:
+      /health:
+        get:
+          summary: Health check endpoint
+          responses:
+            '200':
+              description: Service is healthy
+      /api/agents/info:
+        get:
+          summary: Lista los agentes disponibles y sus herramientas
+          responses:
+            '200':
+              description: Info de agentes
+      /api/agents/chat:
+        post:
+          summary: Chat multi-agente con streaming SSE
+          responses:
+            '200':
+              description: Stream de eventos server-sent
+      /api/agents/trajectories:
+        get:
+          summary: Resumen de trayectorias (observabilidad)
+          responses:
+            '200':
+              description: Resumen de trayectorias
+      /api/agents/costs:
+        get:
+          summary: Resumen de costos por agente
+          responses:
+            '200':
+              description: Resumen de costos
